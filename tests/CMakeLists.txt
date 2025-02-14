@@ -14,6 +14,7 @@ add_executable(
         uint16_test.cpp
         uint32_test.cpp
         uint64_test.cpp
+        type_tests.cpp
 )
 
 target_link_libraries(

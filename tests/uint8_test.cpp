@@ -6,7 +6,7 @@
 #include <msgpack23/msgpack23.h>
 
 namespace {
-    class UInt8Test : public testing::TestWithParam<uint8_t> {
+    class msgpack23_uint8 : public testing::TestWithParam<uint8_t> {
     };
 
     struct UInt8Struct {
@@ -23,7 +23,7 @@ namespace {
         }
     };
 
-    TEST_P(UInt8Test, intTest) {
+    TEST_P(msgpack23_uint8, intTest) {
         UInt8Struct const testIntStruct{
             GetParam()
         };
@@ -40,5 +40,5 @@ namespace {
         42,
         std::numeric_limits<int8_t>::max()
     };
-    INSTANTIATE_TEST_SUITE_P(SomeValuesTest, UInt8Test, testing::ValuesIn(uint8_numbers));
+    INSTANTIATE_TEST_SUITE_P(SomeValuesTest, msgpack23_uint8, testing::ValuesIn(uint8_numbers));
 }

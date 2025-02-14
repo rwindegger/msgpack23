@@ -6,7 +6,7 @@
 #include <msgpack23/msgpack23.h>
 
 namespace {
-    class Int16Test : public testing::TestWithParam<int16_t> {
+    class msgpack23_int16 : public testing::TestWithParam<int16_t> {
     };
 
     struct Int16Struct {
@@ -23,7 +23,7 @@ namespace {
         }
     };
 
-    TEST_P(Int16Test, intTest) {
+    TEST_P(msgpack23_int16, int16Test) {
         Int16Struct const testIntStruct{
             GetParam()
         };
@@ -44,5 +44,5 @@ namespace {
         std::numeric_limits<int16_t>::max(),
         std::numeric_limits<int16_t>::min()
     };
-    INSTANTIATE_TEST_SUITE_P(SomeValuesTest, Int16Test, testing::ValuesIn(int16_numbers));
+    INSTANTIATE_TEST_SUITE_P(SomeValuesTest, msgpack23_int16, testing::ValuesIn(int16_numbers));
 }

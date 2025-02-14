@@ -6,7 +6,7 @@
 #include <msgpack23/msgpack23.h>
 
 namespace {
-    class UInt64Test : public testing::TestWithParam<uint64_t> {
+    class msgpack23_uint64 : public testing::TestWithParam<uint64_t> {
     };
 
     struct UInt64Struct {
@@ -23,7 +23,7 @@ namespace {
         }
     };
 
-    TEST_P(UInt64Test, intTest) {
+    TEST_P(msgpack23_uint64, intTest) {
         UInt64Struct const testIntStruct{
             GetParam()
         };
@@ -43,6 +43,8 @@ namespace {
         std::numeric_limits<int32_t>::max(),
         std::numeric_limits<int32_t>::max() - 1,
         std::numeric_limits<int64_t>::max(),
+        std::numeric_limits<int64_t>::max() - 1,
+        std::numeric_limits<uint64_t>::max(),
     };
-    INSTANTIATE_TEST_SUITE_P(SomeValuesTest, UInt64Test, testing::ValuesIn(uint64_numbers));
+    INSTANTIATE_TEST_SUITE_P(SomeValuesTest, msgpack23_uint64, testing::ValuesIn(uint64_numbers));
 }
