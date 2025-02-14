@@ -4,12 +4,16 @@ find_package(GTest REQUIRED)
 
 add_executable(
         msgpack23_tests
-        main.cpp
-        overall_test.cpp
         int8_test.cpp
         int16_test.cpp
         int32_test.cpp
         int64_test.cpp
+        main.cpp
+        overall_test.cpp
+        uint8_test.cpp
+        uint16_test.cpp
+        uint32_test.cpp
+        uint64_test.cpp
 )
 
 target_link_libraries(
