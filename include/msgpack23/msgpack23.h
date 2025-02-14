@@ -7,7 +7,6 @@
 #include <bit>
 #include <bitset>
 #include <chrono>
-#include <cmath>
 #include <cstddef>
 #include <cstring>
 #include <string>
