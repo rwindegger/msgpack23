@@ -94,4 +94,25 @@ namespace {
         EXPECT_EQ(obj.nestedStruct.values, test.nestedStruct.values);
         EXPECT_EQ(obj.nestedStruct.tuple, test.nestedStruct.tuple);
     }
+
+    struct MyData {
+        int64_t my_integer;
+        std::string my_string;
+
+        template<typename T>
+        std::vector<std::byte> pack(T &packer) const {
+            return packer(my_integer, my_string);
+        }
+
+        template<typename T>
+        void unpack(T &unpacker) {
+            unpacker(my_integer, my_string);
+        }
+    };
+
+    TEST(msgpack23, MyDataTest) {
+        MyData const my_data {42, "Hello" };
+        auto const data = msgpack23::pack(my_data);
+        auto obj = msgpack23::unpack<MyData>(data);
+    }
 }
