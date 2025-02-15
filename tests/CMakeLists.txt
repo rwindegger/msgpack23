@@ -6,16 +6,16 @@ find_package(GTest REQUIRED)
 
 add_executable(
         msgpack23_tests
-        int8_test.cpp
-        int16_test.cpp
-        int32_test.cpp
-        int64_test.cpp
+        int8_tests.cpp
+        int16_tests.cpp
+        int32_tests.cpp
+        int64_tests.cpp
         main.cpp
         object_packing_tests.cpp
-        uint8_test.cpp
-        uint16_test.cpp
-        uint32_test.cpp
-        uint64_test.cpp
+        uint8_tests.cpp
+        uint16_tests.cpp
+        uint32_tests.cpp
+        uint64_tests.cpp
         type_packing_tests.cpp
 )
 

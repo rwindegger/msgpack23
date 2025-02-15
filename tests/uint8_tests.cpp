@@ -41,4 +41,17 @@ namespace {
         std::numeric_limits<int8_t>::max()
     };
     INSTANTIATE_TEST_SUITE_P(SomeValuesTest, msgpack23_uint8, testing::ValuesIn(uint8_numbers));
+
+    TEST(msgpack23, uint8Packing) {
+        constexpr auto iterations = 20U;
+        for (std::uint8_t i = 0; i < iterations; ++i) {
+            msgpack23::Packer packer {};
+            auto const expected = static_cast<std::uint8_t>(i * (std::numeric_limits<std::uint8_t>::max() / iterations));
+            auto data = packer(expected);
+            msgpack23::Unpacker unpacker {data.data(), data.size()};
+            std::uint8_t actual {};
+            unpacker(actual);
+            EXPECT_EQ(actual, expected);
+        }
+    }
 }
