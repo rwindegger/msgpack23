@@ -24,6 +24,7 @@ target_link_libraries(
         GTest::gtest
         GTest::gtest_main
 )
+add_test(msgpack23_tests msgpack23_tests)
 
 set_target_properties(msgpack23_tests PROPERTIES CXX_STANDARD 23)
 target_compile_features(msgpack23_tests PUBLIC cxx_std_23)

@@ -76,4 +76,5 @@ export(
 )
 export(PACKAGE msgpack23)
 
+enable_testing()
 add_subdirectory(tests)
