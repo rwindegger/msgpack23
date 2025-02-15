@@ -46,6 +46,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - uses: seanmiddleditch/gha-setup-ninja@master
 
     - name: Set reusable strings
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
@@ -68,6 +69,7 @@ jobs:
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
       run: >
         cmake -B ${{ steps.strings.outputs.build-output-dir }}
+        -G Ninja
         -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=conan_provider.cmake
         -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
         -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
