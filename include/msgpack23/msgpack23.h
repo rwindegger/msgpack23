@@ -731,7 +731,7 @@ namespace msgpack23 {
     }
 
     template<>
-    inline void Unpacker::unpack_type(nullptr_t &) {
+    inline void Unpacker::unpack_type(std::nullptr_t &) {
         increment();
     }
 
