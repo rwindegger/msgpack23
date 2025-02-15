@@ -9,7 +9,7 @@ add_executable(
         int32_test.cpp
         int64_test.cpp
         main.cpp
-        overall_test.cpp
+        object_packing_tests.cpp
         uint8_test.cpp
         uint16_test.cpp
         uint32_test.cpp

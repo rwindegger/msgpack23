@@ -53,7 +53,7 @@ namespace {
         }
     };
 
-    TEST(msgpack23, OverallTest) {
+    TEST(msgpack23, NestedObjectPacking) {
         std::map<std::string, std::string> map;
         map.insert(std::pair<std::string, std::string>("first", "hello"));
         map.insert(std::pair<std::string, std::string>("second", "world"));
@@ -110,7 +110,7 @@ namespace {
         }
     };
 
-    TEST(msgpack23, MyDataTest) {
+    TEST(msgpack23, SimpleObjectPacking) {
         MyData const my_data {42, "Hello" };
         auto const data = msgpack23::pack(my_data);
         auto obj = msgpack23::unpack<MyData>(data);
