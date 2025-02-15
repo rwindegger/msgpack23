@@ -2,8 +2,12 @@
 // Created by Rene Windegger on 14/02/2025.
 //
 
+#include <cmath>
 #include <gtest/gtest.h>
+#include <list>
+#include <map>
 #include <msgpack23/msgpack23.h>
+#include <unordered_map>
 
 namespace {
     TEST(msgpack23, FloatTypePacking) {
@@ -119,6 +123,97 @@ namespace {
         EXPECT_EQ(data, expected_data);
         msgpack23::Unpacker unpacker{data.data(), data.size()};
         std::vector<uint8_t> actual{};
+        unpacker(actual);
+        EXPECT_EQ(expected, actual);
+    }
+
+    TEST(msgpack23, ArrayTypePacking) {
+        msgpack23::Packer packer{};
+        std::list<std::string> const expected{"one", "two", "three"};
+        std::vector<std::byte> const expected_data{
+            static_cast<std::byte>(0b10010000 | 3),
+            static_cast<std::byte>(0b10100000 | 3),
+            static_cast<std::byte>('o'),
+            static_cast<std::byte>('n'),
+            static_cast<std::byte>('e'),
+            static_cast<std::byte>(0b10100000 | 3),
+            static_cast<std::byte>('t'),
+            static_cast<std::byte>('w'),
+            static_cast<std::byte>('o'),
+            static_cast<std::byte>(0b10100000 | 5),
+            static_cast<std::byte>('t'),
+            static_cast<std::byte>('h'),
+            static_cast<std::byte>('r'),
+            static_cast<std::byte>('e'),
+            static_cast<std::byte>('e'),
+        };
+        auto const data = packer(expected);
+        EXPECT_EQ(data, expected_data);
+        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        std::list<std::string> actual{};
+        unpacker(actual);
+        EXPECT_EQ(expected, actual);
+    }
+
+    TEST(msgpack23, StdArrayTypePacking) {
+        msgpack23::Packer packer{};
+        std::array<std::string, 3> const expected{"one", "two", "three"};
+        std::vector<std::byte> const expected_data{
+            static_cast<std::byte>(0b10010000 | 3),
+            static_cast<std::byte>(0b10100000 | 3),
+            static_cast<std::byte>('o'),
+            static_cast<std::byte>('n'),
+            static_cast<std::byte>('e'),
+            static_cast<std::byte>(0b10100000 | 3),
+            static_cast<std::byte>('t'),
+            static_cast<std::byte>('w'),
+            static_cast<std::byte>('o'),
+            static_cast<std::byte>(0b10100000 | 5),
+            static_cast<std::byte>('t'),
+            static_cast<std::byte>('h'),
+            static_cast<std::byte>('r'),
+            static_cast<std::byte>('e'),
+            static_cast<std::byte>('e'),
+        };
+        auto const data = packer(expected);
+        EXPECT_EQ(data, expected_data);
+        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        std::array<std::string, 3> actual{};
+        unpacker(actual);
+        EXPECT_EQ(expected, actual);
+    }
+
+    TEST(msgpack23, MapTypePacking) {
+        msgpack23::Packer packer{};
+        std::map<uint8_t, std::string> const expected{std::make_pair(0, "zero"), std::make_pair(1, "one")};
+        std::vector<std::byte> const expected_data{
+            static_cast<std::byte>(0b10000000 | 2),
+            static_cast<std::byte>(0),
+            static_cast<std::byte>(0b10100000 | 4),
+            static_cast<std::byte>('z'),
+            static_cast<std::byte>('e'),
+            static_cast<std::byte>('r'),
+            static_cast<std::byte>('o'),
+            static_cast<std::byte>(1),
+            static_cast<std::byte>(0b10100000 | 3),
+            static_cast<std::byte>('o'),
+            static_cast<std::byte>('n'),
+            static_cast<std::byte>('e'),
+        };
+        auto const data = packer(expected);
+        EXPECT_EQ(data, expected_data);
+        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        std::map<uint8_t, std::string> actual{};
+        unpacker(actual);
+        EXPECT_EQ(expected, actual);
+    }
+
+    TEST(msgpack23, UnorderedMapTypePacking) {
+        msgpack23::Packer packer{};
+        std::unordered_map<uint8_t, std::string> const expected{std::make_pair(0, "zero"), std::make_pair(1, "one")};
+        auto const data = packer(expected);
+        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        std::unordered_map<uint8_t, std::string> actual{};
         unpacker(actual);
         EXPECT_EQ(expected, actual);
     }
