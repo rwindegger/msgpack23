@@ -6,17 +6,20 @@ find_package(GTest REQUIRED)
 
 add_executable(
         msgpack23_tests
+        array_tests.cpp
         int8_tests.cpp
         int16_tests.cpp
         int32_tests.cpp
         int64_tests.cpp
         main.cpp
+        map_tests.cpp
         object_packing_tests.cpp
+        string_tests.cpp
+        type_packing_tests.cpp
         uint8_tests.cpp
         uint16_tests.cpp
         uint32_tests.cpp
         uint64_tests.cpp
-        type_packing_tests.cpp
 )
 
 target_link_libraries(
