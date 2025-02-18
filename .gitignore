@@ -5,3 +5,4 @@
 /.vs/
 /out/
 /cmake-build-debug-wsl-coverage/
+CMakeUserPresets.json
