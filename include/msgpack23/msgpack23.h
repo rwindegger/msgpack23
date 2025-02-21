@@ -53,63 +53,48 @@ namespace msgpack23 {
         map32 = 0xdf
     };
 
-    template<typename T, typename U = void>
-    struct is_map : std::false_type {
+    template<typename T>
+    concept MapLike = requires(T t, const typename T::key_type &k)
+    {
+        typename T::key_type;
+        typename T::mapped_type;
+        typename T::size_type;
+        typename T::allocator_type;
+        typename T::iterator;
+        typename T::const_iterator;
+
+        { t[k] } -> std::same_as<typename T::mapped_type &>;
+        { t.size() } -> std::same_as<typename T::size_type>;
+        { t.begin() } -> std::same_as<typename T::iterator>;
+        { t.end() } -> std::same_as<typename T::iterator>;
+        { t.cbegin() } -> std::same_as<typename T::const_iterator>;
+        { t.cend() } -> std::same_as<typename T::const_iterator>;
     };
 
     template<typename T>
-    struct is_map<
-                T,
-                std::void_t<
-                    typename T::key_type,
-                    typename T::mapped_type,
-                    typename T::size_type,
-                    typename T::allocator_type,
-                    typename T::iterator,
-                    typename T::const_iterator,
-                    decltype(std::declval<T &>()[std::declval<const typename T::key_type &>()]),
-                    decltype(std::declval<T>().size()),
-                    decltype(std::declval<T>().begin()),
-                    decltype(std::declval<T>().end()),
-                    decltype(std::declval<T>().cbegin()),
-                    decltype(std::declval<T>().cend())
-                >
-            > : std::true_type {
-    };
+    concept CollectionLike = requires(T t)
+    {
+        typename T::value_type;
+        typename T::size_type;
+        typename T::iterator;
+        typename T::const_iterator;
 
-    template<typename T, typename U = void>
-    struct is_collection : std::false_type {
+        { t.size() } -> std::same_as<typename T::size_type>;
+        { t.begin() } -> std::same_as<typename T::iterator>;
+        { t.end() } -> std::same_as<typename T::iterator>;
+        { t.cbegin() } -> std::same_as<typename T::const_iterator>;
+        { t.cend() } -> std::same_as<typename T::const_iterator>;
     };
 
     template<typename T>
-    struct is_collection<
-                T,
-                std::void_t<
-                    typename T::value_type,
-                    typename T::size_type,
-                    typename T::iterator,
-                    typename T::const_iterator,
-                    decltype(std::declval<T>().size()),
-                    decltype(std::declval<T>().begin()),
-                    decltype(std::declval<T>().end()),
-                    decltype(std::declval<T>().cbegin()),
-                    decltype(std::declval<T>().cend())
-                >
-            > : std::true_type {
-    };
-
-    template<typename T, typename U = void>
-    struct is_emplace_available : std::false_type {
+    concept EmplaceAvailable = requires(T t, typename T::value_type val)
+    {
+        // Simply require that calling t.emplace_back(val) is valid
+        t.emplace_back(val);
     };
 
     template<typename T>
-    struct is_emplace_available<
-                T,
-                std::void_t<
-                    decltype(std::declval<T>().emplace_back(std::declval<typename T::value_type>()))
-                >
-            > : std::true_type {
-    };
+    concept EnumLike = std::is_enum_v<T>;
 
     template<typename T, std::enable_if_t<std::is_integral_v<T>, int>  = 0>
     [[nodiscard]] constexpr T to_big_endian(T const value) noexcept {
@@ -183,12 +168,8 @@ namespace msgpack23 {
             return true;
         }
 
-        template<
-            typename T,
-            std::enable_if_t<is_collection<T>{}, int>  = 0,
-            std::enable_if_t<is_map<T>{}, int>  = 0,
-            std::enable_if_t<!std::is_enum<T>{}, int>  = 0
-        >
+        template<CollectionLike T>
+            requires MapLike<T> && (!EnumLike<T>)
         void pack_type(T const &value) {
             if (!pack_map_header(value.size())) {
                 return;
@@ -199,12 +180,8 @@ namespace msgpack23 {
             }
         }
 
-        template<
-            typename T,
-            std::enable_if_t<is_collection<T>{}, int>  = 0,
-            std::enable_if_t<!is_map<T>{}, int>  = 0,
-            std::enable_if_t<!std::is_enum<T>{}, int>  = 0
-        >
+        template<CollectionLike T>
+            requires (!MapLike<T> && !EnumLike<T>)
         void pack_type(T const &value) {
             if (!pack_array_header(value.size())) {
                 return;
@@ -214,22 +191,13 @@ namespace msgpack23 {
             }
         }
 
-        template<
-            typename T,
-            std::enable_if_t<!is_collection<T>{}, int>  = 0,
-            std::enable_if_t<!is_map<T>{}, int>  = 0,
-            std::enable_if_t<std::is_enum<T>{}, int>  = 0
-        >
+        template<EnumLike T>
         void pack_type(T const &value) {
             pack_type(std::to_underlying(value));
         }
 
-        template<
-            typename T,
-            std::enable_if_t<!is_collection<T>{}, int>  = 0,
-            std::enable_if_t<!is_map<T>{}, int>  = 0,
-            std::enable_if_t<!std::is_enum<T>{}, int>  = 0
-        >
+        template<typename T>
+            requires (!CollectionLike<T> && !MapLike<T> && !EnumLike<T>)
         void pack_type(T const &value) {
             value.pack(*this);
         }
@@ -248,7 +216,8 @@ namespace msgpack23 {
             }
             seconds += count * duration_t::period::num / duration_t::period::den;
             if (seconds >> 34 == 0) {
-                auto const data64 = static_cast<std::uint64_t>(nano_seconds) << 34 | static_cast<std::uint64_t>(seconds);
+                auto const data64 = static_cast<std::uint64_t>(nano_seconds) << 34 | static_cast<std::uint64_t>(
+                                        seconds);
                 if ((data64 & 0xFFFFFFFC00000000LL) == 0) {
                     emplace_constant(FormatConstants::fixext4);
                     emplace_integral(static_cast<std::int8_t>(-1));
@@ -441,15 +410,10 @@ namespace msgpack23 {
         }
     }
 
-    template<typename T, typename U = void>
-    struct is_packable_object : std::false_type {
-    };
-
     template<typename T>
-    struct is_packable_object<
-                T,
-                std::void_t<decltype(std::declval<T>().pack(std::declval<Packer &>()))>
-            > : std::true_type {
+    concept PackableObject = requires(T t, Packer p)
+    {
+        { t.pack(p) } -> std::same_as<std::vector<std::byte> >;
     };
 
     class Unpacker {
@@ -527,12 +491,8 @@ namespace msgpack23 {
             return array_size;
         }
 
-        template<
-            typename T,
-            std::enable_if_t<is_collection<T>{}, int>  = 0,
-            std::enable_if_t<is_map<T>{}, int>  = 0,
-            std::enable_if_t<!std::is_enum<T>{}, int>  = 0
-        >
+        template<MapLike T>
+            requires CollectionLike<T> && (!EnumLike<T>)
         void unpack_type(T &value) {
             using KeyType = typename T::key_type;
             using ValueType = typename T::mapped_type;
@@ -546,13 +506,8 @@ namespace msgpack23 {
             }
         }
 
-        template<
-            typename T,
-            std::enable_if_t<is_collection<T>{}, int>  = 0,
-            std::enable_if_t<is_emplace_available<T>{}, int>  = 0,
-            std::enable_if_t<!is_map<T>{}, int>  = 0,
-            std::enable_if_t<!std::is_enum<T>{}, int>  = 0
-        >
+        template<CollectionLike T>
+            requires (!MapLike<T> && EmplaceAvailable<T> && (!EnumLike<T>))
         void unpack_type(T &value) {
             using ValueType = typename T::value_type;
             auto const array_size = unpack_array_header();
@@ -563,13 +518,8 @@ namespace msgpack23 {
             }
         }
 
-        template<
-            typename T,
-            std::enable_if_t<is_collection<T>{}, int>  = 0,
-            std::enable_if_t<!is_emplace_available<T>{}, int>  = 0,
-            std::enable_if_t<!is_map<T>{}, int>  = 0,
-            std::enable_if_t<!std::is_enum<T>{}, int>  = 0
-        >
+        template<CollectionLike T>
+            requires (!MapLike<T> && (!EmplaceAvailable<T>) && (!EnumLike<T>))
         void unpack_type(T &value) {
             using ValueType = typename T::value_type;
             std::vector<ValueType> vec;
@@ -577,22 +527,13 @@ namespace msgpack23 {
             std::copy(vec.begin(), vec.end(), value.begin());
         }
 
-        template<
-            typename T,
-            std::enable_if_t<!is_collection<T>{}, int>  = 0,
-            std::enable_if_t<!is_map<T>{}, int>  = 0,
-            std::enable_if_t<std::is_enum<T>{}, int>  = 0
-        >
+        template<EnumLike T>
         void unpack_type(T &value) {
             unpack_type(reinterpret_cast<std::underlying_type_t<T> &>(value));
         }
 
-        template<
-            typename T,
-            std::enable_if_t<!is_collection<T>{}, int>  = 0,
-            std::enable_if_t<!is_map<T>{}, int>  = 0,
-            std::enable_if_t<!std::is_enum<T>{}, int>  = 0
-        >
+        template<typename T>
+            requires (!CollectionLike<T> && !MapLike<T> && !EnumLike<T>)
         void unpack_type(T &value) {
             value.unpack(*this);
         }
@@ -846,45 +787,24 @@ namespace msgpack23 {
         }
         if (data_start_ + bin_size <= data_end_) {
             value = std::vector<std::uint8_t>(reinterpret_cast<std::uint8_t const *>(data_start_),
-                                         reinterpret_cast<std::uint8_t const *>(data_start_) + bin_size);
+                                              reinterpret_cast<std::uint8_t const *>(data_start_) + bin_size);
             increment(bin_size);
         }
     }
 
-    template<typename T, typename U = void>
-    struct is_unpackable_object : std::false_type {
-    };
-
     template<typename T>
-    struct is_unpackable_object<
-                T,
-                std::void_t<decltype(std::declval<T>().unpack(std::declval<Packer &>()))>
-            > : std::true_type {
+    concept UnpackableObject = requires(T t, Unpacker u)
+    {
+        t.unpack(u);
     };
 
-
-    template<
-        typename PackableObject,
-        std::enable_if_t<is_packable_object<PackableObject>{}, int>  = 0
-    >
+    template<PackableObject PackableObject>
     [[nodiscard]] std::vector<std::byte> pack(PackableObject const &obj) {
         Packer packer;
         return obj.pack(packer);
     }
 
-    template<
-        typename PackableObject,
-        std::enable_if_t<!is_packable_object<PackableObject>{}, int>  = 0
-    >
-    [[nodiscard]] std::vector<std::byte> pack(PackableObject const &obj) {
-        static_assert(false, "PackableObject is not implemented.");
-        return {};
-    }
-
-    template<
-        typename UnpackableObject,
-        std::enable_if_t<is_unpackable_object<UnpackableObject>{}, int>  = 0
-    >
+    template<UnpackableObject UnpackableObject>
     [[nodiscard]] UnpackableObject unpack(std::byte const *data_start, std::size_t const size) {
         UnpackableObject obj{};
         Unpacker unpacker{data_start, size};
@@ -892,16 +812,7 @@ namespace msgpack23 {
         return obj;
     }
 
-    template<
-        typename UnpackableObject,
-        std::enable_if_t<!is_unpackable_object<UnpackableObject>{}, int>  = 0
-    >
-    [[nodiscard]] UnpackableObject unpack(std::byte const *, std::size_t const) {
-        static_assert(false, "UnpackableObject is not implemented.");
-        return {};
-    }
-
-    template<typename UnpackableObject>
+    template<UnpackableObject UnpackableObject>
     [[nodiscard]] UnpackableObject unpack(std::vector<std::byte> const &data) {
         return unpack<UnpackableObject>(data.data(), data.size());
     }
