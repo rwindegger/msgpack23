@@ -23,7 +23,7 @@ namespace {
         std::chrono::system_clock::now(),
         std::chrono::system_clock::time_point{},
         std::chrono::system_clock::time_point{} - std::chrono::days(200),
-        std::chrono::system_clock::time_point{} - std::chrono::nanoseconds(200),
+        std::chrono::time_point_cast<std::chrono::system_clock::duration>(std::chrono::system_clock::time_point{} - std::chrono::nanoseconds(200)),
     };
     INSTANTIATE_TEST_SUITE_P(SomeValuesTest, msgpack23_time_point, testing::ValuesIn(time_points));
 }
