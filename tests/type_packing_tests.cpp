@@ -230,10 +230,22 @@ namespace {
 
     TEST(msgpack23, UnorderedMapTypePacking) {
         msgpack23::Packer packer{};
-        std::unordered_map<std::uint8_t, std::string> const expected{std::make_pair(0, "zero"), std::make_pair(1, "one")};
+        std::unordered_map<std::uint8_t, std::string> const expected{
+            std::make_pair(0, "zero"), std::make_pair(1, "one")
+        };
         auto const data = packer(expected);
         msgpack23::Unpacker unpacker{data.data(), data.size()};
         std::unordered_map<std::uint8_t, std::string> actual{};
+        unpacker(actual);
+        EXPECT_EQ(expected, actual);
+    }
+
+    TEST(msgpack23, TupleTypePacking) {
+        msgpack23::Packer packer{};
+        std::tuple<std::uint8_t, std::string> const expected{0, "zero"};
+        auto const data = packer(expected);
+        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        std::tuple<std::uint8_t, std::string> actual{};
         unpacker(actual);
         EXPECT_EQ(expected, actual);
     }

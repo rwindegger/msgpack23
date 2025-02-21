@@ -237,19 +237,14 @@ namespace msgpack23 {
             }
         }
 
-        template<std::size_t I = 0, typename... Elements, std::enable_if_t<I == sizeof...(Elements), int>  = 0>
-        void pack_tuple(std::tuple<Elements...> const &) {
-        }
-
-        template<std::size_t I = 0, typename... Elements, std::enable_if_t<I < sizeof...(Elements), int>  = 0>
-        void pack_tuple(std::tuple<Elements...> const &tuple) {
-            pack_type(std::get<I>(tuple));
-            pack_tuple<I + 1, Elements...>(tuple);
-        }
-
         template<typename... Elements>
         void pack_type(std::tuple<Elements...> const &value) {
-            pack_tuple(value);
+            std::apply(
+                [this](auto const &... elems) {
+                    (pack_type(elems), ...);
+                },
+                value
+            );
         }
     };
 
@@ -583,19 +578,14 @@ namespace msgpack23 {
             }
         }
 
-        template<std::size_t I = 0, typename... Elements, std::enable_if_t<I == sizeof...(Elements), int>  = 0>
-        void unpack_tuple(std::tuple<Elements...> &) {
-        }
-
-        template<std::size_t I = 0, typename... Elements, std::enable_if_t<I < sizeof...(Elements), int>  = 0>
-        void unpack_tuple(std::tuple<Elements...> &tuple) {
-            unpack_type(std::get<I>(tuple));
-            unpack_tuple<I + 1, Elements...>(tuple);
-        }
-
         template<typename... Elements>
         void unpack_type(std::tuple<Elements...> &value) {
-            unpack_tuple(value);
+            std::apply(
+                [this](auto &... elems) {
+                    (unpack_type(elems), ...);
+                },
+                value
+            );
         }
     };
 
