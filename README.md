@@ -6,7 +6,7 @@ msgpack23 is a lightweight library that provides a straightforward approach to s
 
 ## Key Features
 - **Header-only**: Simply include the header and start using it—no additional build steps or dependencies.
-- **Modern C++**: Uses C++ features like concepts (via `std::enable_if_t` and detection idioms) to handle containers, maps, enums, time points, and user-defined types.
+- **Modern C++**: Uses C++ features like concepts to handle containers, maps, enums, time points, and user-defined types.
 - **Extensible**: Allows you to define custom types by implementing `pack` and `unpack` member functions, automatically integrating them into the serialization pipeline.
 - **Collection and Map Support**: Automatically detects and serializes STL containers (e.g., `std::vector`, `std::map`) without extra work.
 - **Time Point Support**: Native support for serializing `std::chrono::time_point` objects.
@@ -42,7 +42,7 @@ msgpack23 is a lightweight library that provides a straightforward approach to s
        
        // 2) Unpack back into a map
        std::map<std::string, int> unpacked;
-       msgpack23::Unpacker unpacker(packedData.data(), packedData.size());
+       msgpack23::Unpacker unpacker(packedData);
        unpacker(unpacked);
        
        // Verify the result
