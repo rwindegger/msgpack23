@@ -16,7 +16,7 @@ namespace {
         }
         msgpack23::Packer packer{};
         auto data = packer(expected);
-        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        msgpack23::Unpacker unpacker{data};
         std::vector<std::size_t> actual{};
         unpacker(actual);
         EXPECT_EQ(actual, expected);
@@ -29,7 +29,7 @@ namespace {
         }
         msgpack23::Packer packer{};
         auto data = packer(expected);
-        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        msgpack23::Unpacker unpacker{data};
         std::vector<std::uint8_t> actual{};
         unpacker(actual);
         EXPECT_EQ(actual, expected);

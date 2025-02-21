@@ -49,7 +49,7 @@ namespace {
             auto const expected = static_cast<std::uint8_t>(
                 i * (std::numeric_limits<std::uint8_t>::max() / iterations));
             auto data = packer(expected);
-            msgpack23::Unpacker unpacker{data.data(), data.size()};
+            msgpack23::Unpacker unpacker{data};
             std::uint8_t actual{};
             unpacker(actual);
             EXPECT_EQ(actual, expected);

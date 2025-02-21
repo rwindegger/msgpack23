@@ -17,7 +17,7 @@ namespace {
         }
         msgpack23::Packer packer{};
         auto data = packer(expected);
-        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        msgpack23::Unpacker unpacker{data};
         std::string actual{};
         unpacker(actual);
         EXPECT_EQ(actual, expected);

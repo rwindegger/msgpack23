@@ -15,7 +15,7 @@ namespace {
             float expected = 5.0f + static_cast<float>(i) * 23456.78f / 3.14f;
             msgpack23::Packer packer{};
             auto data = packer(expected);
-            msgpack23::Unpacker unpacker{data.data(), data.size()};
+            msgpack23::Unpacker unpacker{data};
             float actual{};
             unpacker(actual);
             EXPECT_EQ(expected, actual);
@@ -25,7 +25,7 @@ namespace {
             float expected = static_cast<float>(i) * std::pow(0.1f, std::abs(i));
             msgpack23::Packer packer{};
             auto data = packer(expected);
-            msgpack23::Unpacker unpacker{data.data(), data.size()};
+            msgpack23::Unpacker unpacker{data};
             float actual{};
             unpacker(actual);
             EXPECT_EQ(expected, actual);
@@ -37,7 +37,7 @@ namespace {
             double expected = 5.0 + static_cast<double>(i) * 23456.78 / 3.14;
             msgpack23::Packer packer{};
             auto data = packer(expected);
-            msgpack23::Unpacker unpacker{data.data(), data.size()};
+            msgpack23::Unpacker unpacker{data};
             double actual{};
             unpacker(actual);
             EXPECT_EQ(expected, actual);
@@ -47,7 +47,7 @@ namespace {
             double expected = static_cast<double>(i) * std::pow(0.1, std::abs(i));
             msgpack23::Packer packer{};
             auto data = packer(expected);
-            msgpack23::Unpacker unpacker{data.data(), data.size()};
+            msgpack23::Unpacker unpacker{data};
             double actual{};
             unpacker(actual);
             EXPECT_EQ(expected, actual);
@@ -65,7 +65,7 @@ namespace {
             msgpack23::Packer packer{};
             auto const data = packer(false);
             ASSERT_EQ(data, std::vector<std::byte>{static_cast<std::byte>(0xc2)});
-            msgpack23::Unpacker unpacker{data.data(), data.size()};
+            msgpack23::Unpacker unpacker{data};
             bool actual{};
             unpacker(actual);
             EXPECT_EQ(false, actual);
@@ -73,7 +73,7 @@ namespace {
             msgpack23::Packer packer{};
             auto const data = packer(true);
             ASSERT_EQ(data, std::vector<std::byte>{static_cast<std::byte>(0xc3)});
-            msgpack23::Unpacker unpacker{data.data(), data.size()};
+            msgpack23::Unpacker unpacker{data};
             bool actual{};
             unpacker(actual);
             EXPECT_EQ(true, actual);
@@ -84,7 +84,7 @@ namespace {
         msgpack23::Packer packer{};
         auto const expected = std::chrono::system_clock::now();
         auto const data = packer(expected);
-        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        msgpack23::Unpacker unpacker{data};
         decltype(std::chrono::system_clock::now()) actual{};
         unpacker(actual);
         EXPECT_EQ(expected, actual);
@@ -94,7 +94,7 @@ namespace {
         msgpack23::Packer packer{};
         auto const expected = std::chrono::steady_clock::now();
         auto const data = packer(expected);
-        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        msgpack23::Unpacker unpacker{data};
         decltype(std::chrono::steady_clock::now()) actual{};
         unpacker(actual);
         EXPECT_EQ(expected, actual);
@@ -104,7 +104,7 @@ namespace {
         msgpack23::Packer packer{};
         auto const expected = std::chrono::high_resolution_clock::now();
         auto const data = packer(expected);
-        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        msgpack23::Unpacker unpacker{data};
         decltype(std::chrono::high_resolution_clock::now()) actual{};
         unpacker(actual);
         EXPECT_EQ(expected, actual);
@@ -122,7 +122,7 @@ namespace {
         };
         auto const data = packer(expected);
         EXPECT_EQ(data, expected_data);
-        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        msgpack23::Unpacker unpacker{data};
         std::string actual{};
         unpacker(actual);
         EXPECT_EQ(expected, actual);
@@ -141,7 +141,7 @@ namespace {
         };
         auto const data = packer(expected);
         EXPECT_EQ(data, expected_data);
-        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        msgpack23::Unpacker unpacker{data};
         std::vector<std::uint8_t> actual{};
         unpacker(actual);
         EXPECT_EQ(expected, actual);
@@ -169,7 +169,7 @@ namespace {
         };
         auto const data = packer(expected);
         EXPECT_EQ(data, expected_data);
-        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        msgpack23::Unpacker unpacker{data};
         std::list<std::string> actual{};
         unpacker(actual);
         EXPECT_EQ(expected, actual);
@@ -197,7 +197,7 @@ namespace {
         };
         auto const data = packer(expected);
         EXPECT_EQ(data, expected_data);
-        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        msgpack23::Unpacker unpacker{data};
         std::array<std::string, 3> actual{};
         unpacker(actual);
         EXPECT_EQ(expected, actual);
@@ -222,7 +222,7 @@ namespace {
         };
         auto const data = packer(expected);
         EXPECT_EQ(data, expected_data);
-        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        msgpack23::Unpacker unpacker{data};
         std::map<std::uint8_t, std::string> actual{};
         unpacker(actual);
         EXPECT_EQ(expected, actual);
@@ -234,7 +234,7 @@ namespace {
             std::make_pair(0, "zero"), std::make_pair(1, "one")
         };
         auto const data = packer(expected);
-        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        msgpack23::Unpacker unpacker{data};
         std::unordered_map<std::uint8_t, std::string> actual{};
         unpacker(actual);
         EXPECT_EQ(expected, actual);
@@ -244,7 +244,7 @@ namespace {
         msgpack23::Packer packer{};
         std::tuple<std::uint8_t, std::string> const expected{0, "zero"};
         auto const data = packer(expected);
-        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        msgpack23::Unpacker unpacker{data};
         std::tuple<std::uint8_t, std::string> actual{};
         unpacker(actual);
         EXPECT_EQ(expected, actual);

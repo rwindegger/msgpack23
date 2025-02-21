@@ -43,7 +43,7 @@ namespace {
             msgpack23::Packer packer {};
             auto const expected = static_cast<std::int8_t>(i * (std::numeric_limits<std::int8_t>::max() / 10));
             auto data = packer(expected);
-            msgpack23::Unpacker unpacker {data.data(), data.size()};
+            msgpack23::Unpacker unpacker {data};
             std::int8_t actual {};
             unpacker(actual);
             EXPECT_EQ(actual, expected);

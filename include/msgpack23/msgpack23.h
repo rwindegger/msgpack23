@@ -9,6 +9,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstring>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -417,10 +418,10 @@ namespace msgpack23 {
 
     class Unpacker {
     public:
-        Unpacker() : data_start_(nullptr), data_end_(nullptr) {
+        Unpacker() : data_() {
         }
 
-        Unpacker(std::byte const *const data, std::size_t const size) : data_start_(data), data_end_(data + size) {
+        explicit Unpacker(std::span<std::byte const> data) : data_(data) {
         }
 
         template<typename... Types>
@@ -429,19 +430,19 @@ namespace msgpack23 {
         }
 
     private:
-        std::byte const *data_start_;
-        std::byte const *const data_end_;
+        std::span<std::byte const> data_;
+        std::size_t position_{0};
 
         [[nodiscard]] std::byte current() const {
-            if (data_start_ < data_end_) {
-                return *data_start_;
+            if (position_ < data_.size()) {
+                return data_[position_];
             }
             return static_cast<std::byte>(0);
         }
 
         void increment(std::size_t const count = 1) {
-            if (data_end_ - data_start_ >= count) {
-                data_start_ += count;
+            if (position_ + count < data_.size()) {
+                position_ += count;
             }
         }
 
@@ -452,8 +453,8 @@ namespace msgpack23 {
         template<typename T, std::enable_if_t<std::is_unsigned_v<T>, int>  = 0>
         [[nodiscard]] T read_integral() {
             T result{};
-            std::memcpy(&result, data_start_, sizeof(T));
-            data_start_ += sizeof(T);
+            std::memcpy(&result, data_.data() + position_, sizeof(T));
+            position_ += sizeof(T);
             result = from_big_endian(result);
             return result;
         }
@@ -766,8 +767,8 @@ namespace msgpack23 {
             str_size = std::to_integer<std::size_t>(current() & static_cast<std::byte>(0b00011111));
             increment();
         }
-        if (data_start_ + str_size <= data_end_) {
-            value = std::string(reinterpret_cast<const char *>(data_start_), str_size);
+        if (position_ + str_size <= data_.size()) {
+            value = std::string(reinterpret_cast<const char *>(data_.data() + position_), str_size);
             increment(str_size);
         }
     }
@@ -779,9 +780,9 @@ namespace msgpack23 {
         } else if (read_conditional<FormatConstants::bin16, std::uint16_t>(bin_size)) {
         } else if (read_conditional<FormatConstants::bin8, std::uint8_t>(bin_size)) {
         }
-        if (data_start_ + bin_size <= data_end_) {
-            value = std::vector<std::uint8_t>(reinterpret_cast<std::uint8_t const *>(data_start_),
-                                              reinterpret_cast<std::uint8_t const *>(data_start_) + bin_size);
+        if (position_ + bin_size <= data_.size()) {
+            auto const *src = reinterpret_cast<std::uint8_t const *>(data_.data() + position_);
+            value.assign(src, src + bin_size);
             increment(bin_size);
         }
     }
@@ -799,15 +800,10 @@ namespace msgpack23 {
     }
 
     template<UnpackableObject UnpackableObject>
-    [[nodiscard]] UnpackableObject unpack(std::byte const *data_start, std::size_t const size) {
+    [[nodiscard]] UnpackableObject unpack(std::span<const std::byte> const data) {
+        Unpacker unpacker(data);
         UnpackableObject obj{};
-        Unpacker unpacker{data_start, size};
         obj.unpack(unpacker);
         return obj;
-    }
-
-    template<UnpackableObject UnpackableObject>
-    [[nodiscard]] UnpackableObject unpack(std::vector<std::byte> const &data) {
-        return unpack<UnpackableObject>(data.data(), data.size());
     }
 }

@@ -13,7 +13,7 @@ namespace {
         msgpack23::Packer packer{};
         auto const expected = GetParam();
         auto const data = packer(expected);
-        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        msgpack23::Unpacker unpacker{data};
         std::chrono::system_clock::time_point actual{};
         unpacker(actual);
         EXPECT_EQ(expected, actual);
