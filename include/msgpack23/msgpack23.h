@@ -384,9 +384,11 @@ namespace msgpack23 {
         }
 
         data_.reserve(data_.size() + value.size());
-        for (auto const c: value) {
-            data_.emplace_back(static_cast<std::byte>(c));
-        }
+        data_.insert(
+            data_.end(),
+            reinterpret_cast<const std::byte *>(value.data()),
+            reinterpret_cast<const std::byte *>(value.data()) + value.size()
+        );
     }
 
     template<>
@@ -405,9 +407,11 @@ namespace msgpack23 {
         }
 
         data_.reserve(data_.size() + value.size());
-        for (auto const elem: value) {
-            data_.emplace_back(static_cast<std::byte>(elem));
-        }
+        data_.insert(
+            data_.end(),
+            reinterpret_cast<const std::byte *>(value.data()),
+            reinterpret_cast<const std::byte *>(value.data()) + value.size()
+        );
     }
 
     template<typename T>
