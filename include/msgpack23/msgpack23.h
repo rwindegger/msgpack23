@@ -207,19 +207,21 @@ namespace msgpack23 {
         void pack_type(std::chrono::time_point<T> const &value) {
             using duration_t = typename std::chrono::time_point<T>::duration;
             auto const count = static_cast<std::int64_t>(value.time_since_epoch().count());
+            constexpr auto nano_seconds_per_second = 1'000'000'000;
+            constexpr auto nano_seconds_mask = 0xFFFFFFFC00000000LL;
 
-            auto const nano_num = duration_t::period::ratio::num * (1'000'000'000 / duration_t::period::den);
-            std::int64_t nano_seconds = count % (1'000'000'000 / nano_num) * nano_num;
+            auto const nano_num = duration_t::period::ratio::num * (nano_seconds_per_second / duration_t::period::den);
+            std::int64_t nano_seconds = count % (nano_seconds_per_second / nano_num) * nano_num;
             std::int64_t seconds{};
             if (nano_seconds < 0) {
-                nano_seconds = 1'000'000'000 + nano_seconds;
+                nano_seconds = nano_seconds_per_second + nano_seconds;
                 --seconds;
             }
             seconds += count * duration_t::period::num / duration_t::period::den;
             if (seconds >> 34 == 0) {
                 auto const data64 = static_cast<std::uint64_t>(nano_seconds) << 34 | static_cast<std::uint64_t>(
                                         seconds);
-                if ((data64 & 0xFFFFFFFC00000000LL) == 0) {
+                if ((data64 & nano_seconds_mask) == 0) {
                     emplace_constant(FormatConstants::fixext4);
                     emplace_integral(static_cast<std::int8_t>(-1));
                     auto const data32 = static_cast<std::uint32_t>(data64);
@@ -556,9 +558,10 @@ namespace msgpack23 {
                 increment();
                 if (static_cast<std::int8_t>(current()) == -1) {
                     increment();
+                    constexpr auto seconds_mask = 0x00000003FFFFFFFFLL;
                     auto const data64 = read_integral<std::uint64_t>();
                     auto const nano_seconds = static_cast<std::uint32_t>(data64 >> 34);
-                    auto const seconds = data64 & 0x00000003FFFFFFFFLL;
+                    auto const seconds = data64 & seconds_mask;
                     tp += std::chrono::duration_cast<duration_t>(std::chrono::nanoseconds(nano_seconds));
                     tp += std::chrono::seconds(seconds);
                     value = tp;
