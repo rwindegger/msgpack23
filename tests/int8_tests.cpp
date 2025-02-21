@@ -34,7 +34,7 @@ namespace {
     }
 
     constexpr std::int8_t int8_numbers[] = {
-        0, 1, std::numeric_limits<int8_t>::min(), std::numeric_limits<int8_t>::max(), 42, -42
+        0, 1, std::numeric_limits<std::int8_t>::min(), std::numeric_limits<std::int8_t>::max(), 42, -42
     };
     INSTANTIATE_TEST_SUITE_P(SomeValuesTest, msgpack23_int8, testing::ValuesIn(int8_numbers));
 

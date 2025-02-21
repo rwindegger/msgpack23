@@ -6,11 +6,11 @@
 #include <msgpack23/msgpack23.h>
 
 namespace {
-    class msgpack23_uint32 : public testing::TestWithParam<uint32_t> {
+    class msgpack23_uint32 : public testing::TestWithParam<std::uint32_t> {
     };
 
     struct UInt32Struct {
-        uint32_t uint32;
+        std::uint32_t uint32;
 
         template<class T>
         std::vector<std::byte> pack(T &packer) const {
@@ -32,17 +32,17 @@ namespace {
         EXPECT_EQ(int32, GetParam());
     }
 
-    constexpr uint32_t uint32_numbers[] = {
+    constexpr std::uint32_t uint32_numbers[] = {
         0,
         1,
-        std::numeric_limits<int8_t>::max(),
-        std::numeric_limits<int8_t>::max() - 1,
+        std::numeric_limits<std::int8_t>::max(),
+        std::numeric_limits<std::int8_t>::max() - 1,
         42,
         0x81,
-        std::numeric_limits<int16_t>::max(),
-        std::numeric_limits<int16_t>::max() - 1,
-        std::numeric_limits<int32_t>::max(),
-        std::numeric_limits<uint32_t>::max(),
+        std::numeric_limits<std::int16_t>::max(),
+        std::numeric_limits<std::int16_t>::max() - 1,
+        std::numeric_limits<std::int32_t>::max(),
+        std::numeric_limits<std::uint32_t>::max(),
     };
     INSTANTIATE_TEST_SUITE_P(SomeValuesTest, msgpack23_uint32, testing::ValuesIn(uint32_numbers));
 

@@ -6,11 +6,11 @@
 #include <msgpack23/msgpack23.h>
 
 namespace {
-    class msgpack23_uint8 : public testing::TestWithParam<uint8_t> {
+    class msgpack23_uint8 : public testing::TestWithParam<std::uint8_t> {
     };
 
     struct UInt8Struct {
-        uint8_t uint8;
+        std::uint8_t uint8;
 
         template<class T>
         std::vector<std::byte> pack(T &packer) const {
@@ -32,13 +32,13 @@ namespace {
         EXPECT_EQ(int8, GetParam());
     }
 
-    constexpr uint8_t uint8_numbers[] = {
+    constexpr std::uint8_t uint8_numbers[] = {
         0,
         1,
-        std::numeric_limits<uint8_t>::min(),
-        std::numeric_limits<uint8_t>::max(),
+        std::numeric_limits<std::uint8_t>::min(),
+        std::numeric_limits<std::uint8_t>::max(),
         42,
-        std::numeric_limits<int8_t>::max()
+        std::numeric_limits<std::int8_t>::max()
     };
     INSTANTIATE_TEST_SUITE_P(SomeValuesTest, msgpack23_uint8, testing::ValuesIn(uint8_numbers));
 

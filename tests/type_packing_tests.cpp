@@ -130,7 +130,7 @@ namespace {
 
     TEST(msgpack23, ByteArrayTypePacking) {
         msgpack23::Packer packer{};
-        std::vector<uint8_t> const expected{1, 2, 3, 4};
+        std::vector<std::uint8_t> const expected{1, 2, 3, 4};
         std::vector<std::byte> const expected_data{
             static_cast<std::byte>(0xc4),
             static_cast<std::byte>(4),
@@ -142,7 +142,7 @@ namespace {
         auto const data = packer(expected);
         EXPECT_EQ(data, expected_data);
         msgpack23::Unpacker unpacker{data.data(), data.size()};
-        std::vector<uint8_t> actual{};
+        std::vector<std::uint8_t> actual{};
         unpacker(actual);
         EXPECT_EQ(expected, actual);
     }
@@ -205,7 +205,7 @@ namespace {
 
     TEST(msgpack23, MapTypePacking) {
         msgpack23::Packer packer{};
-        std::map<uint8_t, std::string> const expected{std::make_pair(0, "zero"), std::make_pair(1, "one")};
+        std::map<std::uint8_t, std::string> const expected{std::make_pair(0, "zero"), std::make_pair(1, "one")};
         std::vector<std::byte> const expected_data{
             static_cast<std::byte>(0b10000000 | 2),
             static_cast<std::byte>(0),
@@ -223,17 +223,17 @@ namespace {
         auto const data = packer(expected);
         EXPECT_EQ(data, expected_data);
         msgpack23::Unpacker unpacker{data.data(), data.size()};
-        std::map<uint8_t, std::string> actual{};
+        std::map<std::uint8_t, std::string> actual{};
         unpacker(actual);
         EXPECT_EQ(expected, actual);
     }
 
     TEST(msgpack23, UnorderedMapTypePacking) {
         msgpack23::Packer packer{};
-        std::unordered_map<uint8_t, std::string> const expected{std::make_pair(0, "zero"), std::make_pair(1, "one")};
+        std::unordered_map<std::uint8_t, std::string> const expected{std::make_pair(0, "zero"), std::make_pair(1, "one")};
         auto const data = packer(expected);
         msgpack23::Unpacker unpacker{data.data(), data.size()};
-        std::unordered_map<uint8_t, std::string> actual{};
+        std::unordered_map<std::uint8_t, std::string> actual{};
         unpacker(actual);
         EXPECT_EQ(expected, actual);
     }

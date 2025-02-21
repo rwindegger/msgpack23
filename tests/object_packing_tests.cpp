@@ -8,7 +8,7 @@
 #include <msgpack23/msgpack23.h>
 
 namespace {
-    enum class TestEnum : uint8_t {
+    enum class TestEnum : std::uint8_t {
         First = 0,
         Second = 1,
         Third = 2,
@@ -31,12 +31,12 @@ namespace {
     };
 
     struct TestStruct {
-        int64_t int64;
-        uint32_t uint32;
+        std::int64_t int64;
+        std::uint32_t uint32;
         float float32;
         double double64;
         std::string string;
-        std::vector<uint8_t> data;
+        std::vector<std::uint8_t> data;
         std::map<std::string, std::string> map;
         TestEnum testEnum;
         std::chrono::time_point<std::chrono::system_clock> time_point;
@@ -96,7 +96,7 @@ namespace {
     }
 
     struct MyData {
-        int64_t my_integer;
+        std::int64_t my_integer;
         std::string my_string;
 
         template<typename T>
