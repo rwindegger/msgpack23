@@ -80,12 +80,32 @@ namespace {
         }
     }
 
-    TEST(msgpack23, ChronoTypePacking) {
+    TEST(msgpack23, SystemClockTypePacking) {
         msgpack23::Packer packer{};
         auto const expected = std::chrono::system_clock::now();
         auto const data = packer(expected);
         msgpack23::Unpacker unpacker{data.data(), data.size()};
         decltype(std::chrono::system_clock::now()) actual{};
+        unpacker(actual);
+        EXPECT_EQ(expected, actual);
+    }
+
+    TEST(msgpack23, SteadyClockTypePacking) {
+        msgpack23::Packer packer{};
+        auto const expected = std::chrono::steady_clock::now();
+        auto const data = packer(expected);
+        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        decltype(std::chrono::steady_clock::now()) actual{};
+        unpacker(actual);
+        EXPECT_EQ(expected, actual);
+    }
+
+    TEST(msgpack23, HighResolutionClockTypePacking) {
+        msgpack23::Packer packer{};
+        auto const expected = std::chrono::high_resolution_clock::now();
+        auto const data = packer(expected);
+        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        decltype(std::chrono::high_resolution_clock::now()) actual{};
         unpacker(actual);
         EXPECT_EQ(expected, actual);
     }

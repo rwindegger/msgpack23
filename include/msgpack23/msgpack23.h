@@ -236,7 +236,36 @@ namespace msgpack23 {
 
         template<typename T>
         void pack_type(std::chrono::time_point<T> const &value) {
-            pack_type(value.time_since_epoch().count());
+            using duration_t = typename std::chrono::time_point<T>::duration;
+            auto const count = static_cast<int64_t>(value.time_since_epoch().count());
+
+            auto const nano_num = duration_t::period::ratio::num * (1000000000 / duration_t::period::den);
+            int64_t nano_seconds = count % (1000000000 / nano_num) * nano_num;
+            int64_t seconds{};
+            if (nano_seconds < 0) {
+                nano_seconds = 1000000000 + nano_seconds;
+                --seconds;
+            }
+            seconds += count * duration_t::period::num / duration_t::period::den;
+            if (seconds >> 34 == 0) {
+                auto const data64 = static_cast<uint64_t>(nano_seconds) << 34 | static_cast<uint64_t>(seconds);
+                if ((data64 & 0xFFFFFFFC00000000LL) == 0) {
+                    emplace_constant(FormatConstants::fixext4);
+                    emplace_integral(static_cast<int8_t>(-1));
+                    auto const data32 = static_cast<uint32_t>(data64);
+                    emplace_integral(data32);
+                } else {
+                    emplace_constant(FormatConstants::fixext8);
+                    emplace_integral(static_cast<int8_t>(-1));
+                    emplace_integral(data64);
+                }
+            } else {
+                emplace_constant(FormatConstants::ext8);
+                emplace_integral(static_cast<uint8_t>(12));
+                emplace_integral(static_cast<int8_t>(-1));
+                emplace_integral(static_cast<uint32_t>(nano_seconds));
+                emplace_integral(seconds);
+            }
         }
 
         template<size_t I = 0, typename... Elements, std::enable_if_t<I == sizeof...(Elements), int>  = 0>
@@ -568,12 +597,43 @@ namespace msgpack23 {
 
         template<typename Clock, typename Duration>
         void unpack_type(std::chrono::time_point<Clock, Duration> &value) {
-            using RepType = typename std::chrono::time_point<Clock, Duration>::rep;
-            using DurationType = Duration;
-            using TimePointType = std::chrono::time_point<Clock, Duration>;
-            RepType rep{};
-            unpack_type(rep);
-            value = TimePointType(DurationType(rep));
+            using duration_t = typename std::chrono::time_point<Clock, Duration>::duration;
+            using time_point_t = std::chrono::time_point<Clock, Duration>;
+            time_point_t tp {};
+            if (check_constant(FormatConstants::fixext4)) {
+                increment();
+                if (static_cast<int8_t>(current()) == -1) {
+                    increment();
+                    auto const seconds = read_integral<uint32_t>();
+                    tp += std::chrono::seconds(seconds);
+                    value = tp;
+                    return;
+                }
+            } else if (check_constant(FormatConstants::fixext8)) {
+                increment();
+                if (static_cast<int8_t>(current()) == -1) {
+                    increment();
+                    auto const data64 = read_integral<uint64_t>();
+                    auto const nano_seconds = static_cast<uint32_t>(data64 >> 34);
+                    auto const seconds = data64 & 0x00000003FFFFFFFFLL;
+                    tp += std::chrono::duration_cast<duration_t>(std::chrono::nanoseconds(nano_seconds));
+                    tp += std::chrono::seconds(seconds);
+                    value = tp;
+                    return;
+                }
+            } else if (check_constant(FormatConstants::ext8)) {
+                increment();
+                auto const size = read_integral<uint8_t>();
+                if (static_cast<int8_t>(current()) == -1) {
+                    increment();
+                    auto const nano_seconds = read_integral<uint32_t>();
+                    auto const seconds = static_cast<int64_t>(read_integral<uint64_t>());
+                    tp += std::chrono::duration_cast<duration_t>(std::chrono::nanoseconds(nano_seconds));
+                    tp += std::chrono::seconds(seconds);
+                    value = tp;
+                    return;
+                }
+            }
         }
 
         template<size_t I = 0, typename... Elements, std::enable_if_t<I == sizeof...(Elements), int>  = 0>
