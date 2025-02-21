@@ -10,27 +10,27 @@ namespace {
     };
 
     TEST_P(msgpack23_array, arrayTest) {
-        std::vector<std::size_t> expected {};
+        std::vector<std::size_t> expected{};
         for (std::size_t i = 0; i < GetParam(); ++i) {
             expected.emplace_back(i);
         }
-        msgpack23::Packer packer {};
+        msgpack23::Packer packer{};
         auto data = packer(expected);
-        msgpack23::Unpacker unpacker {data.data(), data.size()};
-        std::vector<std::size_t> actual {};
+        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        std::vector<std::size_t> actual{};
         unpacker(actual);
         EXPECT_EQ(actual, expected);
     }
 
     TEST_P(msgpack23_array, binaryTest) {
-        std::vector<std::uint8_t> expected {};
+        std::vector<std::uint8_t> expected{};
         for (std::size_t i = 0; i < GetParam(); ++i) {
             expected.emplace_back(42U);
         }
-        msgpack23::Packer packer {};
+        msgpack23::Packer packer{};
         auto data = packer(expected);
-        msgpack23::Unpacker unpacker {data.data(), data.size()};
-        std::vector<std::uint8_t> actual {};
+        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        std::vector<std::uint8_t> actual{};
         unpacker(actual);
         EXPECT_EQ(actual, expected);
     }

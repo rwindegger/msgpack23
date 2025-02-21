@@ -11,14 +11,14 @@ namespace {
     };
 
     TEST_P(msgpack23_map, arrayTest) {
-        std::map<std::size_t, std::size_t> expected {};
+        std::map<std::size_t, std::size_t> expected{};
         for (std::size_t i = 0; i < GetParam(); ++i) {
             expected.insert_or_assign(i, i);
         }
-        msgpack23::Packer packer {};
+        msgpack23::Packer packer{};
         auto data = packer(expected);
-        msgpack23::Unpacker unpacker {data.data(), data.size()};
-        std::map<std::size_t, std::size_t> actual {};
+        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        std::map<std::size_t, std::size_t> actual{};
         unpacker(actual);
         EXPECT_EQ(actual, expected);
     }

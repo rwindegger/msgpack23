@@ -11,14 +11,14 @@ namespace {
     };
 
     TEST_P(msgpack23_string, arrayTest) {
-        std::string expected {};
+        std::string expected{};
         for (std::size_t i = 0; i < GetParam(); ++i) {
             expected.append("*");
         }
-        msgpack23::Packer packer {};
+        msgpack23::Packer packer{};
         auto data = packer(expected);
-        msgpack23::Unpacker unpacker {data.data(), data.size()};
-        std::string actual {};
+        msgpack23::Unpacker unpacker{data.data(), data.size()};
+        std::string actual{};
         unpacker(actual);
         EXPECT_EQ(actual, expected);
     }

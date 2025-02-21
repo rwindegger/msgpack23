@@ -134,27 +134,27 @@ namespace msgpack23 {
         template<class... Types>
         [[nodiscard]] std::vector<std::byte> operator()(Types const &... args) {
             (pack_type(args), ...);
-            return data;
+            return data_;
         }
 
     private:
-        std::vector<std::byte> data;
+        std::vector<std::byte> data_;
 
         void emplace_constant(FormatConstants const &value) {
-            data.emplace_back(static_cast<std::byte>(std::to_underlying(value)));
+            data_.emplace_back(static_cast<std::byte>(std::to_underlying(value)));
         }
 
         template<typename T, std::enable_if_t<std::is_integral_v<T>, int>  = 0>
         void emplace_integral(T const &value) {
             auto const serialize_value = to_big_endian(value);
             auto const bytes = std::bit_cast<std::array<std::byte, sizeof(serialize_value)> >(serialize_value);
-            data.insert(data.end(), bytes.begin(), bytes.end());
+            data_.insert(data_.end(), bytes.begin(), bytes.end());
         }
 
         [[nodiscard]] bool pack_map_header(size_t const n) {
             if (n < 16) {
                 constexpr auto size_mask = static_cast<std::byte>(0b10000000);
-                data.emplace_back(static_cast<std::byte>(n) | size_mask);
+                data_.emplace_back(static_cast<std::byte>(n) | size_mask);
             } else if (n < std::numeric_limits<uint16_t>::max()) {
                 emplace_constant(FormatConstants::map16);
                 emplace_integral<uint16_t>(static_cast<uint16_t>(n));
@@ -170,7 +170,7 @@ namespace msgpack23 {
         [[nodiscard]] bool pack_array_header(size_t const n) {
             if (n < 16) {
                 constexpr auto size_mask = static_cast<std::byte>(0b10010000);
-                data.emplace_back(static_cast<std::byte>(n) | size_mask);
+                data_.emplace_back(static_cast<std::byte>(n) | size_mask);
             } else if (n < std::numeric_limits<uint16_t>::max()) {
                 emplace_constant(FormatConstants::array16);
                 emplace_integral<uint16_t>(static_cast<uint16_t>(n));
@@ -239,11 +239,11 @@ namespace msgpack23 {
             using duration_t = typename std::chrono::time_point<T>::duration;
             auto const count = static_cast<int64_t>(value.time_since_epoch().count());
 
-            auto const nano_num = duration_t::period::ratio::num * (1000000000 / duration_t::period::den);
-            int64_t nano_seconds = count % (1000000000 / nano_num) * nano_num;
+            auto const nano_num = duration_t::period::ratio::num * (1'000'000'000 / duration_t::period::den);
+            int64_t nano_seconds = count % (1'000'000'000 / nano_num) * nano_num;
             int64_t seconds{};
             if (nano_seconds < 0) {
-                nano_seconds = 1000000000 + nano_seconds;
+                nano_seconds = 1'000'000'000 + nano_seconds;
                 --seconds;
             }
             seconds += count * duration_t::period::num / duration_t::period::den;
@@ -289,7 +289,7 @@ namespace msgpack23 {
         if (value > 31 || value < -32) {
             emplace_constant(FormatConstants::int8);
         }
-        data.emplace_back(static_cast<std::byte>(value));
+        data_.emplace_back(static_cast<std::byte>(value));
     }
 
     template<>
@@ -334,10 +334,10 @@ namespace msgpack23 {
     template<>
     inline void Packer::pack_type(uint8_t const &value) {
         if (value < 0x80) {
-            data.emplace_back(static_cast<std::byte>(value));
+            data_.emplace_back(static_cast<std::byte>(value));
         } else {
             emplace_constant(FormatConstants::uint8);
-            data.emplace_back(static_cast<std::byte>(value));
+            data_.emplace_back(static_cast<std::byte>(value));
         }
     }
 
@@ -400,10 +400,10 @@ namespace msgpack23 {
     template<>
     inline void Packer::pack_type(std::string const &value) {
         if (value.size() < 32) {
-            data.emplace_back(static_cast<std::byte>(value.size()) | static_cast<std::byte>(0b10100000));
+            data_.emplace_back(static_cast<std::byte>(value.size()) | static_cast<std::byte>(0b10100000));
         } else if (value.size() < std::numeric_limits<uint8_t>::max()) {
             emplace_constant(FormatConstants::str8);
-            data.emplace_back(static_cast<std::byte>(value.size()));
+            data_.emplace_back(static_cast<std::byte>(value.size()));
         } else if (value.size() < std::numeric_limits<uint16_t>::max()) {
             emplace_constant(FormatConstants::str16);
             emplace_integral<uint16_t>(static_cast<uint16_t>(value.size()));
@@ -414,8 +414,9 @@ namespace msgpack23 {
             return; // Give up if string is too long
         }
 
+        data_.reserve(data_.size() + value.size());
         for (auto const c: value) {
-            data.emplace_back(static_cast<std::byte>(c));
+            data_.emplace_back(static_cast<std::byte>(c));
         }
     }
 
@@ -423,7 +424,7 @@ namespace msgpack23 {
     inline void Packer::pack_type(std::vector<uint8_t> const &value) {
         if (value.size() < std::numeric_limits<uint8_t>::max()) {
             emplace_constant(FormatConstants::bin8);
-            data.emplace_back(static_cast<std::byte>(value.size()));
+            data_.emplace_back(static_cast<std::byte>(value.size()));
         } else if (value.size() < std::numeric_limits<uint16_t>::max()) {
             emplace_constant(FormatConstants::bin16);
             emplace_integral<uint16_t>(static_cast<uint16_t>(value.size()));
@@ -434,8 +435,9 @@ namespace msgpack23 {
             return; // Give up if vector is too large
         }
 
+        data_.reserve(data_.size() + value.size());
         for (auto const elem: value) {
-            data.emplace_back(static_cast<std::byte>(elem));
+            data_.emplace_back(static_cast<std::byte>(elem));
         }
     }
 
@@ -452,10 +454,10 @@ namespace msgpack23 {
 
     class Unpacker {
     public:
-        Unpacker() : data_start(nullptr), data_end(nullptr) {
+        Unpacker() : data_start_(nullptr), data_end_(nullptr) {
         }
 
-        Unpacker(std::byte const *const data, size_t const size) : data_start(data), data_end(data + size) {
+        Unpacker(std::byte const *const data, size_t const size) : data_start_(data), data_end_(data + size) {
         }
 
         template<typename... Types>
@@ -464,19 +466,19 @@ namespace msgpack23 {
         }
 
     private:
-        std::byte const *data_start;
-        std::byte const *const data_end;
+        std::byte const *data_start_;
+        std::byte const *const data_end_;
 
         [[nodiscard]] std::byte current() const {
-            if (data_start < data_end) {
-                return *data_start;
+            if (data_start_ < data_end_) {
+                return *data_start_;
             }
             return static_cast<std::byte>(0);
         }
 
         void increment(size_t const count = 1) {
-            if (data_end - data_start >= 0) {
-                data_start += count;
+            if (data_end_ - data_start_ >= 0) {
+                data_start_ += count;
             }
         }
 
@@ -487,8 +489,8 @@ namespace msgpack23 {
         template<typename T, std::enable_if_t<std::is_unsigned_v<T>, int>  = 0>
         [[nodiscard]] T read_integral() {
             T result{};
-            std::memcpy(&result, data_start, sizeof(T));
-            data_start += sizeof(T);
+            std::memcpy(&result, data_start_, sizeof(T));
+            data_start_ += sizeof(T);
             result = from_big_endian(result);
             return result;
         }
@@ -599,7 +601,7 @@ namespace msgpack23 {
         void unpack_type(std::chrono::time_point<Clock, Duration> &value) {
             using duration_t = typename std::chrono::time_point<Clock, Duration>::duration;
             using time_point_t = std::chrono::time_point<Clock, Duration>;
-            time_point_t tp {};
+            time_point_t tp{};
             if (check_constant(FormatConstants::fixext4)) {
                 increment();
                 if (static_cast<int8_t>(current()) == -1) {
@@ -829,8 +831,8 @@ namespace msgpack23 {
             str_size = std::to_integer<size_t>(current() & static_cast<std::byte>(0b00011111));
             increment();
         }
-        if (data_start + str_size <= data_end) {
-            value = std::string(reinterpret_cast<const char *>(data_start), str_size);
+        if (data_start_ + str_size <= data_end_) {
+            value = std::string(reinterpret_cast<const char *>(data_start_), str_size);
             increment(str_size);
         }
     }
@@ -842,9 +844,9 @@ namespace msgpack23 {
         } else if (read_conditional<FormatConstants::bin16, uint16_t>(bin_size)) {
         } else if (read_conditional<FormatConstants::bin8, uint8_t>(bin_size)) {
         }
-        if (data_start + bin_size <= data_end) {
-            value = std::vector<uint8_t>(reinterpret_cast<uint8_t const *>(data_start),
-                                         reinterpret_cast<uint8_t const *>(data_start) + bin_size);
+        if (data_start_ + bin_size <= data_end_) {
+            value = std::vector<uint8_t>(reinterpret_cast<uint8_t const *>(data_start_),
+                                         reinterpret_cast<uint8_t const *>(data_start_) + bin_size);
             increment(bin_size);
         }
     }

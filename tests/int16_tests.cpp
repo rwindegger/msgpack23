@@ -49,11 +49,11 @@ namespace {
 
     TEST(msgpack23, int16Packing) {
         for (std::int16_t i = -10; i < 10; ++i) {
-            msgpack23::Packer packer {};
+            msgpack23::Packer packer{};
             auto const expected = static_cast<std::int16_t>(i * (std::numeric_limits<std::int16_t>::max() / 10));
             auto data = packer(expected);
-            msgpack23::Unpacker unpacker {data.data(), data.size()};
-            std::int16_t actual {};
+            msgpack23::Unpacker unpacker{data.data(), data.size()};
+            std::int16_t actual{};
             unpacker(actual);
             EXPECT_EQ(actual, expected);
         }

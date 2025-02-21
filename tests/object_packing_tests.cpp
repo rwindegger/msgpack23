@@ -111,7 +111,7 @@ namespace {
     };
 
     TEST(msgpack23, SimpleObjectPacking) {
-        MyData const my_data {42, "Hello" };
+        MyData const my_data{42, "Hello"};
         auto const data = msgpack23::pack(my_data);
         auto obj = msgpack23::unpack<MyData>(data);
     }

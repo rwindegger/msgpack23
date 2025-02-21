@@ -52,11 +52,12 @@ namespace {
     TEST(msgpack23, uint64Packing) {
         constexpr auto iterations = 200U;
         for (std::uint64_t i = 0; i < iterations; ++i) {
-            msgpack23::Packer packer {};
-            auto const expected = static_cast<std::uint64_t>(i * (std::numeric_limits<std::uint64_t>::max() / iterations));
+            msgpack23::Packer packer{};
+            auto const expected = static_cast<std::uint64_t>(
+                i * (std::numeric_limits<std::uint64_t>::max() / iterations));
             auto data = packer(expected);
-            msgpack23::Unpacker unpacker {data.data(), data.size()};
-            std::uint64_t actual {};
+            msgpack23::Unpacker unpacker{data.data(), data.size()};
+            std::uint64_t actual{};
             unpacker(actual);
             EXPECT_EQ(actual, expected);
         }
