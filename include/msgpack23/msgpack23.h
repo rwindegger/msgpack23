@@ -462,7 +462,7 @@ namespace msgpack23 {
         }
 
         template<FormatConstants FC, typename T, typename U>
-        bool read_conditional(U &out) {
+        [[nodiscard]] bool read_conditional(U &out) {
             if (check_constant(FC)) {
                 increment();
                 out = static_cast<U>(read_integral<T>());
