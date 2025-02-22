@@ -130,7 +130,8 @@ namespace msgpack23 {
             data_.emplace_back(static_cast<std::byte>(std::to_underlying(value)));
         }
 
-        template<typename T, std::enable_if_t<std::is_integral_v<T>, int>  = 0>
+        template<typename T>
+            requires std::is_integral_v<T>
         void emplace_integral(T const &value) {
             auto const serialize_value = to_big_endian(value);
             auto const bytes = std::bit_cast<std::array<std::byte, sizeof(serialize_value)> >(serialize_value);
