@@ -11,9 +11,6 @@ namespace {
         GTEST_SKIP() << "Required map is to large for memory";
         msgpack23::Packer packer{};
         std::map<std::size_t, std::size_t> expected{};
-        static_assert(
-            std::numeric_limits<std::uint32_t>::max() < std::numeric_limits<std::map<std::size_t,
-                std::size_t>::size_type>::max(), "Maps cannot be larger than uint32_t.");
         for (std::map<std::size_t, std::size_t>::size_type i = 0;
              i < static_cast<std::map<std::size_t, std::size_t>::size_type>(std::numeric_limits<std::uint32_t>::max()) +
              1; ++i) {
@@ -23,11 +20,9 @@ namespace {
     }
 
     TEST(msgpack23, CollectionTooLargeTest) {
+        GTEST_SKIP() << "Required collection is to large for memory";
         msgpack23::Packer packer{};
         std::vector<std::size_t> expected{};
-        static_assert(
-            std::numeric_limits<std::uint32_t>::max() < std::numeric_limits<std::vector<std::size_t>::size_type>::max(),
-            "Vectors cannot be larger than uint32_t.");
         expected.resize(
             static_cast<std::vector<std::size_t>::size_type>(std::numeric_limits<std::uint32_t>::max()) + 1);
         EXPECT_THROW(auto _ = packer(expected), std::length_error);
@@ -36,8 +31,6 @@ namespace {
     TEST(msgpack23, StringTooLargeTest) {
         msgpack23::Packer packer{};
         std::string expected{};
-        static_assert(std::numeric_limits<std::uint32_t>::max() < std::numeric_limits<std::string::size_type>::max(),
-                      "Strings cannot be larger than uint32_t.");
         expected.resize(static_cast<std::string::size_type>(std::numeric_limits<std::uint32_t>::max()) + 1);
         EXPECT_THROW(auto _ = packer(expected), std::length_error);
     }
@@ -45,9 +38,6 @@ namespace {
     TEST(msgpack23, VectorTooLargeTest) {
         msgpack23::Packer packer{};
         std::vector<std::uint8_t> expected{};
-        static_assert(
-            std::numeric_limits<std::uint32_t>::max() < std::numeric_limits<std::vector<
-                std::uint8_t>::size_type>::max(), "Vectors cannot be larger than uint32_t.");
         expected.resize(
             static_cast<std::vector<std::uint8_t>::size_type>(std::numeric_limits<std::uint32_t>::max()) + 1);
         EXPECT_THROW(auto _ = packer(expected), std::length_error);
