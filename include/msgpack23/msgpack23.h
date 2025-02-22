@@ -173,7 +173,7 @@ namespace msgpack23 {
             requires MapLike<T> && (!EnumLike<T>)
         void pack_type(T const &value) {
             if (!pack_map_header(value.size())) {
-                return;
+                throw std::length_error("Map is too long to be serialized.");
             }
             for (auto const &item: value) {
                 pack_type(std::get<0>(item));
@@ -185,7 +185,7 @@ namespace msgpack23 {
             requires (!MapLike<T> && !EnumLike<T>)
         void pack_type(T const &value) {
             if (!pack_array_header(value.size())) {
-                return;
+                throw std::length_error("Collection is too long to be serialized.");
             }
             for (auto const &item: value) {
                 pack_type(item);
@@ -378,7 +378,7 @@ namespace msgpack23 {
             emplace_constant(FormatConstants::str32);
             emplace_integral(static_cast<std::uint32_t>(value.size()));
         } else {
-            return; // Give up if string is too long
+            throw std::length_error("String is too long to be serialized.");
         }
 
         data_.reserve(data_.size() + value.size());
@@ -401,7 +401,7 @@ namespace msgpack23 {
             emplace_constant(FormatConstants::bin32);
             emplace_integral(static_cast<std::uint32_t>(value.size()));
         } else {
-            return; // Give up if vector is too large
+            throw std::length_error("Vector is too long to be serialized.");
         }
 
         data_.reserve(data_.size() + value.size());
@@ -439,13 +439,14 @@ namespace msgpack23 {
             if (position_ < data_.size()) {
                 return data_[position_];
             }
-            return static_cast<std::byte>(0);
+            throw std::out_of_range("Unpacker doesn't have enough data.");
         }
 
         void increment(std::size_t const count = 1) {
-            if (position_ + count < data_.size()) {
-                position_ += count;
+            if (position_ + count > data_.size()) {
+                throw std::out_of_range("Unpacker doesn't have enough data.");
             }
+            position_ += count;
         }
 
         [[nodiscard]] bool check_constant(FormatConstants const &value) const {
@@ -454,9 +455,12 @@ namespace msgpack23 {
 
         template<typename T, std::enable_if_t<std::is_unsigned_v<T>, int>  = 0>
         [[nodiscard]] T read_integral() {
+            if (position_ + sizeof(T) > data_.size()) {
+                throw std::out_of_range("Unpacker doesn't have enough data.");
+            }
             T result{};
             std::memcpy(&result, data_.data() + position_, sizeof(T));
-            position_ += sizeof(T);
+            increment(sizeof(T));
             result = from_big_endian(result);
             return result;
         }
@@ -580,6 +584,7 @@ namespace msgpack23 {
                     return;
                 }
             }
+            throw std::logic_error("Unexpected value");
         }
 
         template<typename... Elements>
@@ -748,6 +753,8 @@ namespace msgpack23 {
             increment();
             auto const data = read_integral<std::uint32_t>();
             value = std::bit_cast<float>(data);
+        } else {
+            throw std::logic_error("Unexpected value");
         }
     }
 
@@ -757,6 +764,8 @@ namespace msgpack23 {
             increment();
             auto const data = read_integral<std::uint64_t>();
             value = std::bit_cast<double>(data);
+        } else {
+            throw std::logic_error("Unexpected value");
         }
     }
 
@@ -770,10 +779,11 @@ namespace msgpack23 {
             str_size = std::to_integer<std::size_t>(current() & static_cast<std::byte>(0b00011111));
             increment();
         }
-        if (position_ + str_size <= data_.size()) {
-            value = std::string(reinterpret_cast<const char *>(data_.data() + position_), str_size);
-            increment(str_size);
+        if (position_ + str_size > data_.size()) {
+            throw std::out_of_range("String position is out of range");
         }
+        value = std::string(reinterpret_cast<const char *>(data_.data() + position_), str_size);
+        increment(str_size);
     }
 
     template<>
@@ -782,12 +792,15 @@ namespace msgpack23 {
         if (read_conditional<FormatConstants::bin32, std::uint32_t>(bin_size)) {
         } else if (read_conditional<FormatConstants::bin16, std::uint16_t>(bin_size)) {
         } else if (read_conditional<FormatConstants::bin8, std::uint8_t>(bin_size)) {
+        } else {
+            throw std::logic_error("Unexpected value");
         }
-        if (position_ + bin_size <= data_.size()) {
-            auto const *src = reinterpret_cast<std::uint8_t const *>(data_.data() + position_);
-            value.assign(src, src + bin_size);
-            increment(bin_size);
+        if (position_ + bin_size > data_.size()) {
+            throw std::out_of_range("Vector position is out of range");
         }
+        auto const *src = reinterpret_cast<std::uint8_t const *>(data_.data() + position_);
+        value.assign(src, src + bin_size);
+        increment(bin_size);
     }
 
     template<typename T>

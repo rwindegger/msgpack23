@@ -8,6 +8,7 @@ add_executable(
         msgpack23_tests
         array_tests.cpp
         chrono_tests.cpp
+        exception_tests.cpp
         int8_tests.cpp
         int16_tests.cpp
         int32_tests.cpp
