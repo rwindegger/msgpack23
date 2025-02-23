@@ -249,4 +249,14 @@ namespace {
         unpacker(actual);
         EXPECT_EQ(expected, actual);
     }
+
+    TEST(msgpack23, VariantTypePacking) {
+        msgpack23::Packer packer{};
+        std::variant<std::uint8_t, std::string> const expected{"Hello, Variant!"};
+        auto const data = packer(expected);
+        msgpack23::Unpacker unpacker{data};
+        std::variant<std::uint8_t, std::string> actual{};
+        unpacker(actual);
+        EXPECT_EQ(expected, actual);
+    }
 }

@@ -11,6 +11,8 @@
 #include <cstring>
 #include <span>
 #include <string>
+#include <type_traits>
+#include <variant>
 #include <vector>
 
 namespace msgpack23 {
@@ -96,6 +98,20 @@ namespace msgpack23 {
 
     template<typename T>
     concept EnumLike = std::is_enum_v<T>;
+
+    template<typename T>
+    struct is_variant : std::false_type {
+    };
+
+    template<typename... Types>
+    struct is_variant<std::variant<Types...> > : std::true_type {
+    };
+
+    template<typename T>
+    inline constexpr bool is_variant_v = is_variant<T>::value;
+
+    template<typename T>
+    concept VariantLike = is_variant_v<T>;
 
     template<typename T, std::enable_if_t<std::is_integral_v<T>, int>  = 0>
     [[nodiscard]] constexpr T to_big_endian(T const value) noexcept {
@@ -183,7 +199,7 @@ namespace msgpack23 {
         }
 
         template<CollectionLike T>
-            requires (!MapLike<T> && !EnumLike<T>)
+            requires (!MapLike<T>) && (!EnumLike<T>)
         void pack_type(T const &value) {
             if (!pack_array_header(value.size())) {
                 throw std::length_error("Collection is too long to be serialized.");
@@ -199,7 +215,43 @@ namespace msgpack23 {
         }
 
         template<typename T>
-            requires (!CollectionLike<T> && !MapLike<T> && !EnumLike<T>)
+            requires VariantLike<T>
+        void pack_type(T const &value) {
+            std::vector<std::byte> data{};
+            std::visit([this, &data](auto const &arg) {
+                Packer packer{};
+                data = packer(arg);
+            }, value);
+            auto const index = static_cast<std::int8_t>(value.index());
+            if (index > 127) {
+                throw std::overflow_error("Variant index is to large to be serialized.");
+            }
+            if (data.size() == 1) {
+                emplace_constant(FormatConstants::fixext1);
+            } else if (data.size() == 2) {
+                emplace_constant(FormatConstants::fixext2);
+            } else if (data.size() == 4) {
+                emplace_constant(FormatConstants::fixext4);
+            } else if (data.size() == 8) {
+                emplace_constant(FormatConstants::fixext8);
+            } else if (data.size() < std::numeric_limits<std::uint8_t>::max()) {
+                emplace_constant(FormatConstants::ext8);
+                emplace_integral(static_cast<std::uint8_t>(data.size()));
+            } else if (data.size() < std::numeric_limits<std::uint16_t>::max()) {
+                emplace_constant(FormatConstants::ext16);
+                emplace_integral(static_cast<std::uint16_t>(data.size()));
+            } else if (data.size() < std::numeric_limits<std::uint32_t>::max()) {
+                emplace_constant(FormatConstants::ext32);
+                emplace_integral(static_cast<std::uint32_t>(data.size()));
+            } else {
+                throw std::length_error("Variant is too long to be serialized.");
+            }
+            emplace_integral(index);
+            data_.insert(data_.end(), data.begin(), data.end());
+        }
+
+        template<typename T>
+            requires (!CollectionLike<T>) && (!MapLike<T>) && (!EnumLike<T>) && (!VariantLike<T>)
         void pack_type(T const &value) {
             value.pack(*this);
         }
@@ -476,6 +528,18 @@ namespace msgpack23 {
             return false;
         }
 
+        template<typename Variant, std::size_t Index = 0>
+        Variant create_variant_by_index(std::size_t const i) {
+            if constexpr (Index < std::variant_size_v<Variant>) {
+                if (i == Index) {
+                    return Variant{std::in_place_index<Index>};
+                }
+                return create_variant_by_index<Variant, Index + 1>(i);
+            } else {
+                throw std::logic_error("Invalid variant index");
+            }
+        }
+
         [[nodiscard]] std::size_t unpack_map_header() {
             std::size_t map_size = 0;
             if (read_conditional<FormatConstants::map32, std::uint32_t>(map_size)) {
@@ -514,7 +578,7 @@ namespace msgpack23 {
         }
 
         template<CollectionLike T>
-            requires (!MapLike<T> && EmplaceAvailable<T> && (!EnumLike<T>))
+            requires (!MapLike<T>) && EmplaceAvailable<T> && (!EnumLike<T>)
         void unpack_type(T &value) {
             using ValueType = typename T::value_type;
             auto const array_size = unpack_array_header();
@@ -526,7 +590,7 @@ namespace msgpack23 {
         }
 
         template<CollectionLike T>
-            requires (!MapLike<T> && (!EmplaceAvailable<T>) && (!EnumLike<T>))
+            requires (!MapLike<T>) && (!EmplaceAvailable<T>) && (!EnumLike<T>)
         void unpack_type(T &value) {
             using ValueType = typename T::value_type;
             std::vector<ValueType> vec;
@@ -540,7 +604,52 @@ namespace msgpack23 {
         }
 
         template<typename T>
-            requires (!CollectionLike<T> && !MapLike<T> && !EnumLike<T>)
+            requires VariantLike<T>
+        void unpack_type(T &value) {
+            std::size_t size = 0;
+            if (check_constant(FormatConstants::fixext1)) {
+                increment();
+                size = 1;
+            } else if (check_constant(FormatConstants::fixext2)) {
+                increment();
+                size = 2;
+            } else if (check_constant(FormatConstants::fixext4)) {
+                increment();
+                size = 4;
+            } else if (check_constant(FormatConstants::fixext8)) {
+                increment();
+                size = 8;
+            } else if (check_constant(FormatConstants::ext8)) {
+                increment();
+                size = read_integral<std::uint8_t>();
+            } else if (check_constant(FormatConstants::ext16)) {
+                increment();
+                size = read_integral<std::uint16_t>();
+            } else if (check_constant(FormatConstants::ext32)) {
+                increment();
+                size = read_integral<std::uint32_t>();
+            } else {
+                throw std::logic_error("Unexpected format for std::variant");
+            }
+            auto const index = static_cast<std::int8_t>(read_integral<std::uint8_t>());
+
+            if (index < 0 || index > static_cast<std::int8_t>(std::variant_size_v<T> - 1)) {
+                throw std::out_of_range("Invalid variant index");
+            }
+
+            auto const data_start = data_.subspan(position_, size);
+            increment(size);
+
+            value = create_variant_by_index<T>(index);
+
+            std::visit([this, &data_start](auto &arg) {
+                Unpacker unpacker(data_start);
+                unpacker(arg);
+            }, value);
+        }
+
+        template<typename T>
+            requires (!CollectionLike<T>) && (!MapLike<T>) && (!EnumLike<T>) && (!VariantLike<T>)
         void unpack_type(T &value) {
             value.unpack(*this);
         }
