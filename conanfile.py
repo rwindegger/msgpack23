@@ -3,7 +3,7 @@ from conan.tools.cmake import cmake_layout, CMakeToolchain, CMakeDeps, CMake
 
 class msgpack23(ConanFile):
     name = "msgpack23"
-    version = "1.0"
+    version = "2.0"
 
     license = "MIT"
     author = "Rene Windegger <rene@windegger.wtf>"
