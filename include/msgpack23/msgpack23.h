@@ -915,34 +915,55 @@ namespace msgpack23 {
 
     template<>
     inline void Unpacker::unpack_type(std::nullptr_t &) {
-        increment();
+        switch (current_constant()) {
+            case FormatConstants::nil:
+                increment();
+                break;
+            default:
+                throw std::logic_error("Unexpected value");
+        }
     }
 
     template<>
     inline void Unpacker::unpack_type(bool &value) {
-        value = !check_constant(FormatConstants::false_bool);
-        increment();
+        switch (current_constant()) {
+            case FormatConstants::false_bool:
+            case FormatConstants::true_bool:
+                value = not check_constant(FormatConstants::false_bool);
+                increment();
+                break;
+            default:
+                throw std::logic_error("Unexpected value");
+        }
     }
 
     template<>
     inline void Unpacker::unpack_type(float &value) {
-        if (check_constant(FormatConstants::float32)) {
-            increment();
-            auto const data = read_integral<std::uint32_t>();
-            value = std::bit_cast<float>(data);
-        } else {
-            throw std::logic_error("Unexpected value");
+        switch (current_constant()) {
+            case FormatConstants::float32: {
+                increment();
+                auto const data = read_integral<std::uint32_t>();
+                value = std::bit_cast<float>(data);
+                break;
+            }
+            default: {
+                throw std::logic_error("Unexpected value");
+            }
         }
     }
 
     template<>
     inline void Unpacker::unpack_type(double &value) {
-        if (check_constant(FormatConstants::float64)) {
-            increment();
-            auto const data = read_integral<std::uint64_t>();
-            value = std::bit_cast<double>(data);
-        } else {
-            throw std::logic_error("Unexpected value");
+        switch (current_constant()) {
+            case FormatConstants::float64: {
+                increment();
+                auto const data = read_integral<std::uint64_t>();
+                value = std::bit_cast<double>(data);
+                break;
+            }
+            default: {
+                throw std::logic_error("Unexpected value");
+            }
         }
     }
 

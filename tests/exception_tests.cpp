@@ -43,6 +43,24 @@ namespace {
         EXPECT_THROW(auto _ = packer(expected), std::length_error);
     }
 
+    TEST(msgpack23, WrongFormatForNullPtrTest) {
+        msgpack23::Packer packer{};
+        constexpr double expected{3.1415};
+        auto const data = packer(expected);
+        std::nullptr_t actual;
+        msgpack23::Unpacker unpacker{};
+        EXPECT_THROW(unpacker(actual), std::logic_error);
+    }
+
+    TEST(msgpack23, WrongFormatForBoolTest) {
+        msgpack23::Packer packer{};
+        constexpr double expected{3.1415};
+        auto const data = packer(expected);
+        bool actual;
+        msgpack23::Unpacker unpacker{};
+        EXPECT_THROW(unpacker(actual), std::logic_error);
+    }
+
     TEST(msgpack23, WrongFormatForFloatTest) {
         msgpack23::Packer packer{};
         constexpr double expected{3.1415};
