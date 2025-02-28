@@ -230,6 +230,8 @@ namespace msgpack23 {
                 emplace_constant(FormatConstants::fixext4);
             } else if (data.size() == 8) {
                 emplace_constant(FormatConstants::fixext8);
+            } else if (data.size() == 16) {
+                emplace_constant(FormatConstants::fixext16);
             } else if (data.size() < std::numeric_limits<std::uint8_t>::max()) {
                 emplace_constant(FormatConstants::ext8);
                 emplace_integral(static_cast<std::uint8_t>(data.size()));
@@ -502,6 +504,10 @@ namespace msgpack23 {
             return current() == static_cast<std::byte>(std::to_underlying(value));
         }
 
+        [[nodiscard]] FormatConstants current_constant() const {
+            return static_cast<FormatConstants>(std::to_integer<std::uint8_t>(current()));
+        }
+
         template<typename T, std::enable_if_t<std::is_unsigned_v<T>, int>  = 0>
         [[nodiscard]] T read_integral() {
             if (position_ + sizeof(T) > data_.size()) {
@@ -603,29 +609,41 @@ namespace msgpack23 {
             requires VariantLike<T>
         void unpack_type(T &value) {
             std::size_t size = 0;
-            if (check_constant(FormatConstants::fixext1)) {
-                increment();
-                size = 1;
-            } else if (check_constant(FormatConstants::fixext2)) {
-                increment();
-                size = 2;
-            } else if (check_constant(FormatConstants::fixext4)) {
-                increment();
-                size = 4;
-            } else if (check_constant(FormatConstants::fixext8)) {
-                increment();
-                size = 8;
-            } else if (check_constant(FormatConstants::ext8)) {
-                increment();
-                size = read_integral<std::uint8_t>();
-            } else if (check_constant(FormatConstants::ext16)) {
-                increment();
-                size = read_integral<std::uint16_t>();
-            } else if (check_constant(FormatConstants::ext32)) {
-                increment();
-                size = read_integral<std::uint32_t>();
-            } else {
-                throw std::logic_error("Unexpected format for std::variant");
+            switch (current_constant()) {
+                case FormatConstants::fixext1:
+                    increment();
+                    size = 1;
+                    break;
+                case FormatConstants::fixext2:
+                    increment();
+                    size = 2;
+                    break;
+                case FormatConstants::fixext4:
+                    increment();
+                    size = 4;
+                    break;
+                case FormatConstants::fixext8:
+                    increment();
+                    size = 8;
+                    break;
+                case FormatConstants::fixext16:
+                    increment();
+                    size = 16;
+                    break;
+                case FormatConstants::ext8:
+                    increment();
+                    size = read_integral<std::uint8_t>();
+                    break;
+                case FormatConstants::ext16:
+                    increment();
+                    size = read_integral<std::uint16_t>();
+                    break;
+                case FormatConstants::ext32:
+                    increment();
+                    size = read_integral<std::uint32_t>();
+                    break;
+                default:
+                    throw std::logic_error("Unexpected format for std::variant");
             }
             auto const index = static_cast<std::int8_t>(read_integral<std::uint8_t>());
 
@@ -655,40 +673,49 @@ namespace msgpack23 {
             using duration_t = typename std::chrono::time_point<Clock, Duration>::duration;
             using time_point_t = std::chrono::time_point<Clock, Duration>;
             time_point_t tp{};
-            if (check_constant(FormatConstants::fixext4)) {
-                increment();
-                if (static_cast<std::int8_t>(current()) == -1) {
+            switch (current_constant()) {
+                case FormatConstants::fixext4: {
                     increment();
-                    auto const seconds = read_integral<std::uint32_t>();
-                    tp += std::chrono::seconds(seconds);
-                    value = tp;
-                    return;
+                    if (static_cast<std::int8_t>(current()) == -1) {
+                        increment();
+                        auto const seconds = read_integral<std::uint32_t>();
+                        tp += std::chrono::seconds(seconds);
+                        value = tp;
+                        return;
+                    }
+                    break;
                 }
-            } else if (check_constant(FormatConstants::fixext8)) {
-                increment();
-                if (static_cast<std::int8_t>(current()) == -1) {
+                case FormatConstants::fixext8: {
                     increment();
-                    constexpr auto seconds_mask = 0x00000003FFFFFFFFLL;
-                    auto const data64 = read_integral<std::uint64_t>();
-                    auto const nano_seconds = static_cast<std::uint32_t>(data64 >> 34);
-                    auto const seconds = data64 & seconds_mask;
-                    tp += std::chrono::duration_cast<duration_t>(std::chrono::nanoseconds(nano_seconds));
-                    tp += std::chrono::seconds(seconds);
-                    value = tp;
-                    return;
+                    if (static_cast<std::int8_t>(current()) == -1) {
+                        increment();
+                        constexpr auto seconds_mask = 0x00000003FFFFFFFFLL;
+                        auto const data64 = read_integral<std::uint64_t>();
+                        auto const nano_seconds = static_cast<std::uint32_t>(data64 >> 34);
+                        auto const seconds = data64 & seconds_mask;
+                        tp += std::chrono::duration_cast<duration_t>(std::chrono::nanoseconds(nano_seconds));
+                        tp += std::chrono::seconds(seconds);
+                        value = tp;
+                        return;
+                    }
+                    break;
                 }
-            } else if (check_constant(FormatConstants::ext8)) {
-                increment();
-                auto const size = read_integral<std::uint8_t>();
-                if (static_cast<std::int8_t>(current()) == -1) {
+                case FormatConstants::ext8: {
                     increment();
-                    auto const nano_seconds = read_integral<std::uint32_t>();
-                    auto const seconds = static_cast<std::int64_t>(read_integral<std::uint64_t>());
-                    tp += std::chrono::duration_cast<duration_t>(std::chrono::nanoseconds(nano_seconds));
-                    tp += std::chrono::seconds(seconds);
-                    value = tp;
-                    return;
+                    auto const _ = read_integral<std::uint8_t>();
+                    if (static_cast<std::int8_t>(current()) == -1) {
+                        increment();
+                        auto const nano_seconds = read_integral<std::uint32_t>();
+                        auto const seconds = static_cast<std::int64_t>(read_integral<std::uint64_t>());
+                        tp += std::chrono::duration_cast<duration_t>(std::chrono::nanoseconds(nano_seconds));
+                        tp += std::chrono::seconds(seconds);
+                        value = tp;
+                        return;
+                    }
+                    break;
                 }
+                default:
+                    break;
             }
             throw std::logic_error("Unexpected value");
         }
@@ -706,139 +733,183 @@ namespace msgpack23 {
 
     template<>
     inline void Unpacker::unpack_type(std::int8_t &value) {
-        if (check_constant(FormatConstants::int8)) {
-            increment();
-            value = static_cast<std::int8_t>(current());
-            increment();
-        } else {
-            value = static_cast<std::int8_t>(current());
-            increment();
+        switch (current_constant()) {
+            case FormatConstants::int8:
+                increment();
+            default:
+                value = static_cast<std::int8_t>(current());
+                increment();
         }
     }
 
     template<>
     inline void Unpacker::unpack_type(std::int16_t &value) {
-        if (check_constant(FormatConstants::int16)) {
-            increment();
-            auto const tmp = read_integral<std::uint16_t>();
-            value = static_cast<std::int16_t>(tmp);
-        } else if (check_constant(FormatConstants::int8)) {
-            std::int8_t val;
-            unpack_type(val);
-            value = static_cast<std::int16_t>(val);
-        } else {
-            value = static_cast<std::int16_t>(current());
-            increment();
+        switch (current_constant()) {
+            case FormatConstants::int16: {
+                increment();
+                auto const tmp = read_integral<std::uint16_t>();
+                value = static_cast<std::int16_t>(tmp);
+                break;
+            }
+            case FormatConstants::int8: {
+                std::int8_t val;
+                unpack_type(val);
+                value = static_cast<std::int16_t>(val);
+                break;
+            }
+            default: {
+                value = static_cast<std::int8_t>(current());
+                increment();
+                break;
+            }
         }
     }
 
     template<>
     inline void Unpacker::unpack_type(std::int32_t &value) {
-        if (check_constant(FormatConstants::int32)) {
-            increment();
-            auto const tmp = read_integral<std::uint32_t>();
-            value = static_cast<std::int32_t>(tmp);
-        } else if (check_constant(FormatConstants::int16)) {
-            std::int16_t val;
-            unpack_type(val);
-            value = val;
-        } else if (check_constant(FormatConstants::int8)) {
-            std::int8_t val;
-            unpack_type(val);
-            value = static_cast<std::int32_t>(val);
-        } else {
-            value = static_cast<std::int32_t>(current());
-            increment();
+        switch (current_constant()) {
+            case FormatConstants::int32: {
+                increment();
+                auto const tmp = read_integral<std::uint32_t>();
+                value = static_cast<std::int32_t>(tmp);
+                break;
+            }
+            case FormatConstants::int16: {
+                std::int16_t val;
+                unpack_type(val);
+                value = val;
+                break;
+            }
+            case FormatConstants::int8: {
+                std::int8_t val;
+                unpack_type(val);
+                value = static_cast<std::int32_t>(val);
+                break;
+            }
+            default: {
+                value = static_cast<std::int32_t>(current());
+                increment();
+                break;
+            }
         }
     }
 
     template<>
     inline void Unpacker::unpack_type(std::int64_t &value) {
-        if (check_constant(FormatConstants::int64)) {
-            increment();
-            auto const tmp = read_integral<std::uint64_t>();
-            value = static_cast<std::int64_t>(tmp);
-        } else if (check_constant(FormatConstants::int32)) {
-            std::int32_t val;
-            unpack_type(val);
-            value = val;
-        } else if (check_constant(FormatConstants::int16)) {
-            std::int16_t val;
-            unpack_type(val);
-            value = val;
-        } else if (check_constant(FormatConstants::int8)) {
-            std::int8_t val;
-            unpack_type(val);
-            value = static_cast<std::int64_t>(val);
-        } else {
-            value = static_cast<std::int64_t>(current());
-            increment();
+        switch (current_constant()) {
+            case FormatConstants::int64: {
+                increment();
+                auto const tmp = read_integral<std::uint64_t>();
+                value = static_cast<std::int64_t>(tmp);
+                break;
+            }
+            case FormatConstants::int32: {
+                std::int32_t val;
+                unpack_type(val);
+                value = val;
+                break;
+            }
+            case FormatConstants::int16: {
+                std::int16_t val;
+                unpack_type(val);
+                value = val;
+                break;
+            }
+            case FormatConstants::int8: {
+                std::int8_t val;
+                unpack_type(val);
+                value = static_cast<std::int64_t>(val);
+                break;
+            }
+            default: {
+                value = static_cast<std::int64_t>(current());
+                increment();
+            }
         }
     }
 
     template<>
     inline void Unpacker::unpack_type(std::uint8_t &value) {
-        if (check_constant(FormatConstants::uint8)) {
-            increment();
-            value = std::to_integer<std::uint8_t>(current());
-            increment();
-        } else {
-            value = std::to_integer<std::uint8_t>(current());
-            increment();
+        switch (current_constant()) {
+            case FormatConstants::uint8: {
+                increment();
+            }
+            default: {
+                value = std::to_integer<std::uint8_t>(current());
+                increment();
+                break;
+            }
         }
     }
 
     template<>
     inline void Unpacker::unpack_type(std::uint16_t &value) {
-        if (check_constant(FormatConstants::uint16)) {
-            increment();
-            value = read_integral<std::uint16_t>();
-        } else if (check_constant(FormatConstants::uint8)) {
-            increment();
-            value = std::to_integer<std::uint16_t>(current());
-            increment();
-        } else {
-            value = std::to_integer<std::uint16_t>(current());
-            increment();
+        switch (current_constant()) {
+            case FormatConstants::uint16: {
+                increment();
+                value = read_integral<std::uint16_t>();
+                break;
+            }
+            case FormatConstants::uint8: {
+                increment();
+            }
+            default: {
+                value = std::to_integer<std::uint16_t>(current());
+                increment();
+                break;
+            }
         }
     }
 
     template<>
     inline void Unpacker::unpack_type(std::uint32_t &value) {
-        if (check_constant(FormatConstants::uint32)) {
-            increment();
-            value = read_integral<std::uint32_t>();
-        } else if (check_constant(FormatConstants::uint16)) {
-            increment();
-            value = read_integral<std::uint16_t>();
-        } else if (check_constant(FormatConstants::uint8)) {
-            increment();
-            value = std::to_integer<std::uint32_t>(current());
-            increment();
-        } else {
-            value = std::to_integer<std::uint32_t>(current());
-            increment();
+        switch (current_constant()) {
+            case FormatConstants::uint32: {
+                increment();
+                value = read_integral<std::uint32_t>();
+                break;
+            }
+            case FormatConstants::uint16: {
+                increment();
+                value = read_integral<std::uint16_t>();
+                break;
+            }
+            case FormatConstants::uint8: {
+                increment();
+            }
+            default: {
+                value = std::to_integer<std::uint32_t>(current());
+                increment();
+                break;
+            }
         }
     }
 
     template<>
     inline void Unpacker::unpack_type(std::uint64_t &value) {
-        if (check_constant(FormatConstants::uint64)) {
-            increment();
-            value = read_integral<std::uint64_t>();
-        } else if (check_constant(FormatConstants::uint32)) {
-            increment();
-            value = read_integral<std::uint32_t>();
-        } else if (check_constant(FormatConstants::uint16)) {
-            increment();
-            value = read_integral<std::uint16_t>();
-        } else if (check_constant(FormatConstants::uint8)) {
-            increment();
-            value = std::to_integer<std::uint64_t>(current());
-            increment();
-        } else {
-            value = std::to_integer<std::uint64_t>(current());
-            increment();
+        switch (current_constant()) {
+            case FormatConstants::uint64: {
+                increment();
+                value = read_integral<std::uint64_t>();
+                break;
+            }
+            case FormatConstants::uint32: {
+                increment();
+                value = read_integral<std::uint32_t>();
+                break;
+            }
+            case FormatConstants::uint16: {
+                increment();
+                value = read_integral<std::uint16_t>();
+                break;
+            }
+            case FormatConstants::uint8: {
+                increment();
+            }
+            default: {
+                value = std::to_integer<std::uint64_t>(current());
+                increment();
+            }
         }
     }
 
