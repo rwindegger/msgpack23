@@ -151,7 +151,7 @@ namespace msgpack23 {
 
         template<std::integral T>
         void emplace_combined(FormatConstants const &constant, T const &value) {
-            data_.reserve(1 + sizeof(T));
+            data_.reserve(data_.size() + 1 + sizeof(T));
             emplace_constant(constant);
             emplace_integral<T>(value);
         }
@@ -245,6 +245,7 @@ namespace msgpack23 {
                 throw std::length_error("Variant is too long to be serialized.");
             }
             emplace_integral(index);
+            data_.resize(data.size() + data.size());
             data_.insert(data_.end(), data.begin(), data.end());
         }
 
