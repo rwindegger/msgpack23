@@ -113,7 +113,7 @@ namespace msgpack23 {
     template<typename T>
     concept VariantLike = is_variant_v<T>;
 
-    template<typename T, std::enable_if_t<std::is_integral_v<T>, int>  = 0>
+    template<std::integral T>
     [[nodiscard]] constexpr T to_big_endian(T const value) noexcept {
         if constexpr (std::endian::native == std::endian::little) {
             return std::byteswap(value);
@@ -122,13 +122,9 @@ namespace msgpack23 {
         }
     }
 
-    template<typename T, std::enable_if_t<std::is_integral_v<T>, int>  = 0>
+    template<std::integral T>
     [[nodiscard]] constexpr T from_big_endian(T const value) noexcept {
-        if constexpr (std::endian::native == std::endian::little) {
-            return std::byteswap(value);
-        } else {
-            return value;
-        }
+        return to_big_endian(value);
     }
 
     class Packer {
