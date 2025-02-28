@@ -142,12 +142,18 @@ namespace msgpack23 {
             data_.emplace_back(static_cast<std::byte>(std::to_underlying(value)));
         }
 
-        template<typename T>
-            requires std::is_integral_v<T>
+        template<std::integral T>
         void emplace_integral(T const &value) {
             auto const serialize_value = to_big_endian(value);
             auto const bytes = std::bit_cast<std::array<std::byte, sizeof(serialize_value)> >(serialize_value);
             data_.insert(data_.end(), bytes.begin(), bytes.end());
+        }
+
+        template<std::integral T>
+        void emplace_combined(FormatConstants const &constant, T const &value) {
+            data_.reserve(1 + sizeof(T));
+            emplace_constant(constant);
+            emplace_integral<T>(value);
         }
 
         [[nodiscard]] bool pack_map_header(std::size_t const n) {
@@ -155,11 +161,9 @@ namespace msgpack23 {
                 constexpr auto size_mask = static_cast<std::byte>(0b10000000);
                 data_.emplace_back(static_cast<std::byte>(n) | size_mask);
             } else if (n < std::numeric_limits<std::uint16_t>::max()) {
-                emplace_constant(FormatConstants::map16);
-                emplace_integral(static_cast<std::uint16_t>(n));
+                emplace_combined(FormatConstants::map16, static_cast<std::uint16_t>(n));
             } else if (n < std::numeric_limits<std::uint32_t>::max()) {
-                emplace_constant(FormatConstants::map32);
-                emplace_integral(static_cast<std::uint32_t>(n));
+                emplace_combined(FormatConstants::map32, static_cast<std::uint32_t>(n));
             } else {
                 return false;
             }
@@ -171,11 +175,9 @@ namespace msgpack23 {
                 constexpr auto size_mask = static_cast<std::byte>(0b10010000);
                 data_.emplace_back(static_cast<std::byte>(n) | size_mask);
             } else if (n < std::numeric_limits<std::uint16_t>::max()) {
-                emplace_constant(FormatConstants::array16);
-                emplace_integral(static_cast<std::uint16_t>(n));
+                emplace_combined(FormatConstants::array16, static_cast<std::uint16_t>(n));
             } else if (n < std::numeric_limits<std::uint32_t>::max()) {
-                emplace_constant(FormatConstants::array32);
-                emplace_integral(static_cast<std::uint32_t>(n));
+                emplace_combined(FormatConstants::array32, static_cast<std::uint32_t>(n));
             } else {
                 return false;
             }
@@ -222,6 +224,7 @@ namespace msgpack23 {
             if (index > 127) {
                 throw std::overflow_error("Variant index is to large to be serialized.");
             }
+            
             if (data.size() == 1) {
                 emplace_constant(FormatConstants::fixext1);
             } else if (data.size() == 2) {
@@ -233,14 +236,11 @@ namespace msgpack23 {
             } else if (data.size() == 16) {
                 emplace_constant(FormatConstants::fixext16);
             } else if (data.size() < std::numeric_limits<std::uint8_t>::max()) {
-                emplace_constant(FormatConstants::ext8);
-                emplace_integral(static_cast<std::uint8_t>(data.size()));
+                emplace_combined(FormatConstants::ext8, static_cast<std::uint8_t>(data.size()));
             } else if (data.size() < std::numeric_limits<std::uint16_t>::max()) {
-                emplace_constant(FormatConstants::ext16);
-                emplace_integral(static_cast<std::uint16_t>(data.size()));
+                emplace_combined(FormatConstants::ext16, static_cast<std::uint16_t>(data.size()));
             } else if (data.size() < std::numeric_limits<std::uint32_t>::max()) {
-                emplace_constant(FormatConstants::ext32);
-                emplace_integral(static_cast<std::uint32_t>(data.size()));
+                emplace_combined(FormatConstants::ext32, static_cast<std::uint32_t>(data.size()));
             } else {
                 throw std::length_error("Variant is too long to be serialized.");
             }
@@ -318,8 +318,7 @@ namespace msgpack23 {
         ) {
             pack_type(static_cast<std::int8_t>(value));
         } else {
-            emplace_constant(FormatConstants::int16);
-            emplace_integral(value);
+            emplace_combined(FormatConstants::int16, value);
         }
     }
 
@@ -331,8 +330,7 @@ namespace msgpack23 {
         ) {
             pack_type(static_cast<std::int16_t>(value));
         } else {
-            emplace_constant(FormatConstants::int32);
-            emplace_integral(value);
+            emplace_combined(FormatConstants::int32, value);
         }
     }
 
@@ -344,8 +342,7 @@ namespace msgpack23 {
         ) {
             pack_type(static_cast<std::int32_t>(value));
         } else {
-            emplace_constant(FormatConstants::int64);
-            emplace_integral(value);
+            emplace_combined(FormatConstants::int64, value);
         }
     }
 
@@ -362,8 +359,7 @@ namespace msgpack23 {
     template<>
     inline void Packer::pack_type(std::uint16_t const &value) {
         if (value > std::numeric_limits<std::uint8_t>::max()) {
-            emplace_constant(FormatConstants::uint16);
-            emplace_integral(value);
+            emplace_combined(FormatConstants::uint16, value);
         } else {
             pack_type(static_cast<std::uint8_t>(value));
         }
@@ -372,8 +368,7 @@ namespace msgpack23 {
     template<>
     inline void Packer::pack_type(std::uint32_t const &value) {
         if (value > std::numeric_limits<std::uint16_t>::max()) {
-            emplace_constant(FormatConstants::uint32);
-            emplace_integral(value);
+            emplace_combined(FormatConstants::uint32, value);
         } else {
             pack_type(static_cast<std::uint16_t>(value));
         }
@@ -382,8 +377,7 @@ namespace msgpack23 {
     template<>
     inline void Packer::pack_type(std::uint64_t const &value) {
         if (value > std::numeric_limits<std::uint32_t>::max()) {
-            emplace_constant(FormatConstants::uint64);
-            emplace_integral(value);
+            emplace_combined(FormatConstants::uint64, value);
         } else {
             pack_type(static_cast<std::uint32_t>(value));
         }
@@ -405,14 +399,12 @@ namespace msgpack23 {
 
     template<>
     inline void Packer::pack_type(float const &value) {
-        emplace_constant(FormatConstants::float32);
-        emplace_integral(std::bit_cast<std::uint32_t>(value));
+        emplace_combined(FormatConstants::float32, std::bit_cast<std::uint32_t>(value));
     }
 
     template<>
     inline void Packer::pack_type(double const &value) {
-        emplace_constant(FormatConstants::float64);
-        emplace_integral(std::bit_cast<std::uint64_t>(value));
+        emplace_combined(FormatConstants::float64, std::bit_cast<std::uint64_t>(value));
     }
 
     template<>
@@ -423,11 +415,9 @@ namespace msgpack23 {
             emplace_constant(FormatConstants::str8);
             data_.emplace_back(static_cast<std::byte>(value.size()));
         } else if (value.size() < std::numeric_limits<std::uint16_t>::max()) {
-            emplace_constant(FormatConstants::str16);
-            emplace_integral(static_cast<std::uint16_t>(value.size()));
+            emplace_combined(FormatConstants::str16, static_cast<std::uint16_t>(value.size()));
         } else if (value.size() < std::numeric_limits<std::uint32_t>::max()) {
-            emplace_constant(FormatConstants::str32);
-            emplace_integral(static_cast<std::uint32_t>(value.size()));
+            emplace_combined(FormatConstants::str32, static_cast<std::uint32_t>(value.size()));
         } else {
             throw std::length_error("String is too long to be serialized.");
         }
@@ -446,11 +436,9 @@ namespace msgpack23 {
             emplace_constant(FormatConstants::bin8);
             data_.emplace_back(static_cast<std::byte>(value.size()));
         } else if (value.size() < std::numeric_limits<std::uint16_t>::max()) {
-            emplace_constant(FormatConstants::bin16);
-            emplace_integral(static_cast<std::uint16_t>(value.size()));
+            emplace_combined(FormatConstants::bin16, static_cast<std::uint16_t>(value.size()));
         } else if (value.size() < std::numeric_limits<std::uint32_t>::max()) {
-            emplace_constant(FormatConstants::bin32);
-            emplace_integral(static_cast<std::uint32_t>(value.size()));
+            emplace_combined(FormatConstants::bin32, static_cast<std::uint32_t>(value.size()));
         } else {
             throw std::length_error("Vector is too long to be serialized.");
         }
