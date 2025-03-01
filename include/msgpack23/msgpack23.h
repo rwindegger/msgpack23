@@ -245,7 +245,7 @@ namespace msgpack23 {
                 throw std::length_error("Variant is too long to be serialized.");
             }
             emplace_integral(index);
-            data_.reserve(data.size() + data.size());
+            data_.reserve(data_.size() + data.size());
             data_.insert(data_.end(), data.begin(), data.end());
         }
 
