@@ -127,6 +127,7 @@ namespace msgpack23 {
         return to_big_endian(value);
     }
 
+    template<bool IsDryRun = false>
     class Packer {
     public:
         template<class... Types>
@@ -135,31 +136,55 @@ namespace msgpack23 {
             return data_;
         }
 
+        [[nodiscard]] std::size_t size() const noexcept {
+            if constexpr (IsDryRun) {
+                return required_size_;
+            } else {
+                return data_.size();
+            }
+        }
+
+        void reserve(std::size_t const size) noexcept {
+            data_.reserve(size);
+        }
+
     private:
         std::vector<std::byte> data_;
+        std::size_t required_size_ = 0;
 
         void emplace_constant(FormatConstants const &value) {
-            data_.emplace_back(static_cast<std::byte>(std::to_underlying(value)));
+            if constexpr (IsDryRun) {
+                required_size_ += sizeof(FormatConstants);
+            } else {
+                data_.emplace_back(static_cast<std::byte>(std::to_underlying(value)));
+            }
         }
 
         template<std::integral T>
         void emplace_integral(T const &value) {
-            auto const serialize_value = to_big_endian(value);
-            auto const bytes = std::bit_cast<std::array<std::byte, sizeof(serialize_value)> >(serialize_value);
-            data_.insert(data_.end(), bytes.begin(), bytes.end());
+            if constexpr (IsDryRun) {
+                required_size_ += sizeof(T);
+            } else {
+                auto const serialize_value = to_big_endian(value);
+                auto const bytes = std::bit_cast<std::array<std::byte, sizeof(serialize_value)> >(serialize_value);
+                data_.insert(data_.end(), bytes.begin(), bytes.end());
+            }
         }
 
         template<std::integral T>
         void emplace_combined(FormatConstants const &constant, T const &value) {
-            data_.reserve(data_.size() + 1 + sizeof(T));
             emplace_constant(constant);
             emplace_integral<T>(value);
         }
 
         [[nodiscard]] bool pack_map_header(std::size_t const n) {
             if (n < 16) {
-                constexpr auto size_mask = static_cast<std::byte>(0b10000000);
-                data_.emplace_back(static_cast<std::byte>(n) | size_mask);
+                if constexpr (IsDryRun) {
+                    required_size_ += 1;
+                } else {
+                    constexpr auto size_mask = static_cast<std::byte>(0b10000000);
+                    data_.emplace_back(static_cast<std::byte>(n) | size_mask);
+                }
             } else if (n < std::numeric_limits<std::uint16_t>::max()) {
                 emplace_combined(FormatConstants::map16, static_cast<std::uint16_t>(n));
             } else if (n < std::numeric_limits<std::uint32_t>::max()) {
@@ -172,8 +197,12 @@ namespace msgpack23 {
 
         [[nodiscard]] bool pack_array_header(std::size_t const n) {
             if (n < 16) {
-                constexpr auto size_mask = static_cast<std::byte>(0b10010000);
-                data_.emplace_back(static_cast<std::byte>(n) | size_mask);
+                if constexpr (IsDryRun) {
+                    required_size_ += 1;
+                } else {
+                    constexpr auto size_mask = static_cast<std::byte>(0b10010000);
+                    data_.emplace_back(static_cast<std::byte>(n) | size_mask);
+                }
             } else if (n < std::numeric_limits<std::uint16_t>::max()) {
                 emplace_combined(FormatConstants::array16, static_cast<std::uint16_t>(n));
             } else if (n < std::numeric_limits<std::uint32_t>::max()) {
@@ -217,14 +246,20 @@ namespace msgpack23 {
         void pack_type(T const &value) {
             std::vector<std::byte> data{};
             std::visit([this, &data](auto const &arg) {
-                Packer packer{};
-                data = packer(arg);
+                if constexpr (IsDryRun) {
+                    Packer<IsDryRun> packer{};
+                    packer(arg);
+                    required_size_ += packer.size();
+                } else {
+                    Packer packer{};
+                    data = packer(arg);
+                }
             }, value);
             auto const index = static_cast<std::int8_t>(value.index());
             if (index > 127) {
                 throw std::overflow_error("Variant index is to large to be serialized.");
             }
-            
+
             if (data.size() == 1) {
                 emplace_constant(FormatConstants::fixext1);
             } else if (data.size() == 2) {
@@ -245,8 +280,10 @@ namespace msgpack23 {
                 throw std::length_error("Variant is too long to be serialized.");
             }
             emplace_integral(index);
-            data_.reserve(data_.size() + data.size());
-            data_.insert(data_.end(), data.begin(), data.end());
+
+            if constexpr (not IsDryRun) {
+                data_.insert(data_.end(), data.begin(), data.end());
+            }
         }
 
         template<typename T>
@@ -301,159 +338,176 @@ namespace msgpack23 {
                 value
             );
         }
+
+        void pack_type(std::int8_t const &value) {
+            if (value > 31 || value < -32) {
+                emplace_constant(FormatConstants::int8);
+            }
+            if constexpr (IsDryRun) {
+                required_size_ += 1;
+            } else {
+                data_.emplace_back(static_cast<std::byte>(value));
+            }
+        }
+
+        void pack_type(std::int16_t const &value) {
+            if (
+                value > std::numeric_limits<std::int8_t>::min()
+                and value < std::numeric_limits<std::int8_t>::max()
+            ) {
+                pack_type(static_cast<std::int8_t>(value));
+            } else {
+                emplace_combined(FormatConstants::int16, value);
+            }
+        }
+
+        void pack_type(std::int32_t const &value) {
+            if (
+                value > std::numeric_limits<std::int16_t>::min()
+                and value < std::numeric_limits<std::int16_t>::max()
+            ) {
+                pack_type(static_cast<std::int16_t>(value));
+            } else {
+                emplace_combined(FormatConstants::int32, value);
+            }
+        }
+
+        void pack_type(std::int64_t const &value) {
+            if (
+                value > std::numeric_limits<std::int32_t>::min()
+                and value < std::numeric_limits<std::int32_t>::max()
+            ) {
+                pack_type(static_cast<std::int32_t>(value));
+            } else {
+                emplace_combined(FormatConstants::int64, value);
+            }
+        }
+
+        void pack_type(std::uint8_t const &value) {
+            if (value < 0x80) {
+                if constexpr (IsDryRun) {
+                    required_size_ += 1;
+                } else {
+                    data_.emplace_back(static_cast<std::byte>(value));
+                }
+            } else {
+                emplace_constant(FormatConstants::uint8);
+                if constexpr (IsDryRun) {
+                    required_size_ += 1;
+                } else {
+                    data_.emplace_back(static_cast<std::byte>(value));
+                }
+            }
+        }
+
+        void pack_type(std::uint16_t const &value) {
+            if (value > std::numeric_limits<std::uint8_t>::max()) {
+                emplace_combined(FormatConstants::uint16, value);
+            } else {
+                pack_type(static_cast<std::uint8_t>(value));
+            }
+        }
+
+        void pack_type(std::uint32_t const &value) {
+            if (value > std::numeric_limits<std::uint16_t>::max()) {
+                emplace_combined(FormatConstants::uint32, value);
+            } else {
+                pack_type(static_cast<std::uint16_t>(value));
+            }
+        }
+
+        void pack_type(std::uint64_t const &value) {
+            if (value > std::numeric_limits<std::uint32_t>::max()) {
+                emplace_combined(FormatConstants::uint64, value);
+            } else {
+                pack_type(static_cast<std::uint32_t>(value));
+            }
+        }
+
+        void pack_type(std::nullptr_t const &) {
+            emplace_constant(FormatConstants::nil);
+        }
+
+        void pack_type(bool const &value) {
+            if (value) {
+                emplace_constant(FormatConstants::true_bool);
+            } else {
+                emplace_constant(FormatConstants::false_bool);
+            }
+        }
+
+        void pack_type(float const &value) {
+            emplace_combined(FormatConstants::float32, std::bit_cast<std::uint32_t>(value));
+        }
+
+
+        void pack_type(double const &value) {
+            emplace_combined(FormatConstants::float64, std::bit_cast<std::uint64_t>(value));
+        }
+
+        void pack_type(std::string const &value) {
+            if (value.size() < 32) {
+                if constexpr (IsDryRun) {
+                    required_size_ += 1;
+                } else {
+                    data_.emplace_back(static_cast<std::byte>(value.size()) | static_cast<std::byte>(0b10100000));
+                }
+            } else if (value.size() < std::numeric_limits<std::uint8_t>::max()) {
+                emplace_constant(FormatConstants::str8);
+                if constexpr (IsDryRun) {
+                    required_size_ += 1;
+                } else {
+                    data_.emplace_back(static_cast<std::byte>(value.size()));
+                }
+            } else if (value.size() < std::numeric_limits<std::uint16_t>::max()) {
+                emplace_combined(FormatConstants::str16, static_cast<std::uint16_t>(value.size()));
+            } else if (value.size() < std::numeric_limits<std::uint32_t>::max()) {
+                emplace_combined(FormatConstants::str32, static_cast<std::uint32_t>(value.size()));
+            } else {
+                throw std::length_error("String is too long to be serialized.");
+            }
+
+            if constexpr (IsDryRun) {
+                required_size_ += value.size();
+            } else {
+                data_.insert(
+                    data_.end(),
+                    reinterpret_cast<const std::byte *>(value.data()),
+                    reinterpret_cast<const std::byte *>(value.data()) + value.size()
+                );
+            }
+        }
+
+        void pack_type(std::vector<std::uint8_t> const &value) {
+            if (value.size() < std::numeric_limits<std::uint8_t>::max()) {
+                emplace_constant(FormatConstants::bin8);
+                if constexpr (IsDryRun) {
+                    required_size_ += 1;
+                } else {
+                    data_.emplace_back(static_cast<std::byte>(value.size()));
+                }
+            } else if (value.size() < std::numeric_limits<std::uint16_t>::max()) {
+                emplace_combined(FormatConstants::bin16, static_cast<std::uint16_t>(value.size()));
+            } else if (value.size() < std::numeric_limits<std::uint32_t>::max()) {
+                emplace_combined(FormatConstants::bin32, static_cast<std::uint32_t>(value.size()));
+            } else {
+                throw std::length_error("Vector is too long to be serialized.");
+            }
+
+            if constexpr (IsDryRun) {
+                required_size_ += value.size();
+            } else {
+                data_.insert(
+                    data_.end(),
+                    reinterpret_cast<const std::byte *>(value.data()),
+                    reinterpret_cast<const std::byte *>(value.data()) + value.size()
+                );
+            }
+        }
     };
 
-    template<>
-    inline void Packer::pack_type(std::int8_t const &value) {
-        if (value > 31 || value < -32) {
-            emplace_constant(FormatConstants::int8);
-        }
-        data_.emplace_back(static_cast<std::byte>(value));
-    }
-
-    template<>
-    inline void Packer::pack_type(std::int16_t const &value) {
-        if (
-            value > std::numeric_limits<std::int8_t>::min()
-            and value < std::numeric_limits<std::int8_t>::max()
-        ) {
-            pack_type(static_cast<std::int8_t>(value));
-        } else {
-            emplace_combined(FormatConstants::int16, value);
-        }
-    }
-
-    template<>
-    inline void Packer::pack_type(std::int32_t const &value) {
-        if (
-            value > std::numeric_limits<std::int16_t>::min()
-            and value < std::numeric_limits<std::int16_t>::max()
-        ) {
-            pack_type(static_cast<std::int16_t>(value));
-        } else {
-            emplace_combined(FormatConstants::int32, value);
-        }
-    }
-
-    template<>
-    inline void Packer::pack_type(std::int64_t const &value) {
-        if (
-            value > std::numeric_limits<std::int32_t>::min()
-            and value < std::numeric_limits<std::int32_t>::max()
-        ) {
-            pack_type(static_cast<std::int32_t>(value));
-        } else {
-            emplace_combined(FormatConstants::int64, value);
-        }
-    }
-
-    template<>
-    inline void Packer::pack_type(std::uint8_t const &value) {
-        if (value < 0x80) {
-            data_.emplace_back(static_cast<std::byte>(value));
-        } else {
-            emplace_constant(FormatConstants::uint8);
-            data_.emplace_back(static_cast<std::byte>(value));
-        }
-    }
-
-    template<>
-    inline void Packer::pack_type(std::uint16_t const &value) {
-        if (value > std::numeric_limits<std::uint8_t>::max()) {
-            emplace_combined(FormatConstants::uint16, value);
-        } else {
-            pack_type(static_cast<std::uint8_t>(value));
-        }
-    }
-
-    template<>
-    inline void Packer::pack_type(std::uint32_t const &value) {
-        if (value > std::numeric_limits<std::uint16_t>::max()) {
-            emplace_combined(FormatConstants::uint32, value);
-        } else {
-            pack_type(static_cast<std::uint16_t>(value));
-        }
-    }
-
-    template<>
-    inline void Packer::pack_type(std::uint64_t const &value) {
-        if (value > std::numeric_limits<std::uint32_t>::max()) {
-            emplace_combined(FormatConstants::uint64, value);
-        } else {
-            pack_type(static_cast<std::uint32_t>(value));
-        }
-    }
-
-    template<>
-    inline void Packer::pack_type(std::nullptr_t const &) {
-        emplace_constant(FormatConstants::nil);
-    }
-
-    template<>
-    inline void Packer::pack_type(bool const &value) {
-        if (value) {
-            emplace_constant(FormatConstants::true_bool);
-        } else {
-            emplace_constant(FormatConstants::false_bool);
-        }
-    }
-
-    template<>
-    inline void Packer::pack_type(float const &value) {
-        emplace_combined(FormatConstants::float32, std::bit_cast<std::uint32_t>(value));
-    }
-
-    template<>
-    inline void Packer::pack_type(double const &value) {
-        emplace_combined(FormatConstants::float64, std::bit_cast<std::uint64_t>(value));
-    }
-
-    template<>
-    inline void Packer::pack_type(std::string const &value) {
-        if (value.size() < 32) {
-            data_.emplace_back(static_cast<std::byte>(value.size()) | static_cast<std::byte>(0b10100000));
-        } else if (value.size() < std::numeric_limits<std::uint8_t>::max()) {
-            emplace_constant(FormatConstants::str8);
-            data_.emplace_back(static_cast<std::byte>(value.size()));
-        } else if (value.size() < std::numeric_limits<std::uint16_t>::max()) {
-            emplace_combined(FormatConstants::str16, static_cast<std::uint16_t>(value.size()));
-        } else if (value.size() < std::numeric_limits<std::uint32_t>::max()) {
-            emplace_combined(FormatConstants::str32, static_cast<std::uint32_t>(value.size()));
-        } else {
-            throw std::length_error("String is too long to be serialized.");
-        }
-
-        data_.reserve(data_.size() + value.size());
-        data_.insert(
-            data_.end(),
-            reinterpret_cast<const std::byte *>(value.data()),
-            reinterpret_cast<const std::byte *>(value.data()) + value.size()
-        );
-    }
-
-    template<>
-    inline void Packer::pack_type(std::vector<std::uint8_t> const &value) {
-        if (value.size() < std::numeric_limits<std::uint8_t>::max()) {
-            emplace_constant(FormatConstants::bin8);
-            data_.emplace_back(static_cast<std::byte>(value.size()));
-        } else if (value.size() < std::numeric_limits<std::uint16_t>::max()) {
-            emplace_combined(FormatConstants::bin16, static_cast<std::uint16_t>(value.size()));
-        } else if (value.size() < std::numeric_limits<std::uint32_t>::max()) {
-            emplace_combined(FormatConstants::bin32, static_cast<std::uint32_t>(value.size()));
-        } else {
-            throw std::length_error("Vector is too long to be serialized.");
-        }
-
-        data_.reserve(data_.size() + value.size());
-        data_.insert(
-            data_.end(),
-            reinterpret_cast<const std::byte *>(value.data()),
-            reinterpret_cast<const std::byte *>(value.data()) + value.size()
-        );
-    }
-
     template<typename T>
-    concept PackableObject = requires(T t, Packer p)
+    concept PackableObject = requires(T t, Packer<> p)
     {
         { t.pack(p) } -> std::same_as<std::vector<std::byte> >;
     };
@@ -718,277 +772,263 @@ namespace msgpack23 {
                 value
             );
         }
+
+        void unpack_type(std::int8_t &value) {
+            switch (current_constant()) {
+                case FormatConstants::int8:
+                    increment();
+                default:
+                    value = static_cast<std::int8_t>(current());
+                    increment();
+            }
+        }
+
+        void unpack_type(std::int16_t &value) {
+            switch (current_constant()) {
+                case FormatConstants::int16: {
+                    increment();
+                    auto const tmp = read_integral<std::uint16_t>();
+                    value = static_cast<std::int16_t>(tmp);
+                    break;
+                }
+                case FormatConstants::int8: {
+                    std::int8_t val;
+                    unpack_type(val);
+                    value = static_cast<std::int16_t>(val);
+                    break;
+                }
+                default: {
+                    value = static_cast<std::int8_t>(current());
+                    increment();
+                    break;
+                }
+            }
+        }
+
+        void unpack_type(std::int32_t &value) {
+            switch (current_constant()) {
+                case FormatConstants::int32: {
+                    increment();
+                    auto const tmp = read_integral<std::uint32_t>();
+                    value = static_cast<std::int32_t>(tmp);
+                    break;
+                }
+                case FormatConstants::int16: {
+                    std::int16_t val;
+                    unpack_type(val);
+                    value = val;
+                    break;
+                }
+                case FormatConstants::int8: {
+                    std::int8_t val;
+                    unpack_type(val);
+                    value = static_cast<std::int32_t>(val);
+                    break;
+                }
+                default: {
+                    value = static_cast<std::int32_t>(current());
+                    increment();
+                    break;
+                }
+            }
+        }
+
+        void unpack_type(std::int64_t &value) {
+            switch (current_constant()) {
+                case FormatConstants::int64: {
+                    increment();
+                    auto const tmp = read_integral<std::uint64_t>();
+                    value = static_cast<std::int64_t>(tmp);
+                    break;
+                }
+                case FormatConstants::int32: {
+                    std::int32_t val;
+                    unpack_type(val);
+                    value = val;
+                    break;
+                }
+                case FormatConstants::int16: {
+                    std::int16_t val;
+                    unpack_type(val);
+                    value = val;
+                    break;
+                }
+                case FormatConstants::int8: {
+                    std::int8_t val;
+                    unpack_type(val);
+                    value = static_cast<std::int64_t>(val);
+                    break;
+                }
+                default: {
+                    value = static_cast<std::int64_t>(current());
+                    increment();
+                }
+            }
+        }
+
+        void unpack_type(std::uint8_t &value) {
+            switch (current_constant()) {
+                case FormatConstants::uint8: {
+                    increment();
+                }
+                default: {
+                    value = std::to_integer<std::uint8_t>(current());
+                    increment();
+                    break;
+                }
+            }
+        }
+
+        void unpack_type(std::uint16_t &value) {
+            switch (current_constant()) {
+                case FormatConstants::uint16: {
+                    increment();
+                    value = read_integral<std::uint16_t>();
+                    break;
+                }
+                case FormatConstants::uint8: {
+                    increment();
+                }
+                default: {
+                    value = std::to_integer<std::uint16_t>(current());
+                    increment();
+                    break;
+                }
+            }
+        }
+
+        void unpack_type(std::uint32_t &value) {
+            switch (current_constant()) {
+                case FormatConstants::uint32: {
+                    increment();
+                    value = read_integral<std::uint32_t>();
+                    break;
+                }
+                case FormatConstants::uint16: {
+                    increment();
+                    value = read_integral<std::uint16_t>();
+                    break;
+                }
+                case FormatConstants::uint8: {
+                    increment();
+                }
+                default: {
+                    value = std::to_integer<std::uint32_t>(current());
+                    increment();
+                    break;
+                }
+            }
+        }
+
+        void unpack_type(std::uint64_t &value) {
+            switch (current_constant()) {
+                case FormatConstants::uint64: {
+                    increment();
+                    value = read_integral<std::uint64_t>();
+                    break;
+                }
+                case FormatConstants::uint32: {
+                    increment();
+                    value = read_integral<std::uint32_t>();
+                    break;
+                }
+                case FormatConstants::uint16: {
+                    increment();
+                    value = read_integral<std::uint16_t>();
+                    break;
+                }
+                case FormatConstants::uint8: {
+                    increment();
+                }
+                default: {
+                    value = std::to_integer<std::uint64_t>(current());
+                    increment();
+                }
+            }
+        }
+
+        void unpack_type(std::nullptr_t &) {
+            switch (current_constant()) {
+                case FormatConstants::nil:
+                    increment();
+                    break;
+                default:
+                    throw std::logic_error("Unexpected value");
+            }
+        }
+
+        void unpack_type(bool &value) {
+            switch (current_constant()) {
+                case FormatConstants::false_bool:
+                case FormatConstants::true_bool:
+                    value = not check_constant(FormatConstants::false_bool);
+                    increment();
+                    break;
+                default:
+                    throw std::logic_error("Unexpected value");
+            }
+        }
+
+        void unpack_type(float &value) {
+            switch (current_constant()) {
+                case FormatConstants::float32: {
+                    increment();
+                    auto const data = read_integral<std::uint32_t>();
+                    value = std::bit_cast<float>(data);
+                    break;
+                }
+                default: {
+                    throw std::logic_error("Unexpected value");
+                }
+            }
+        }
+
+        void unpack_type(double &value) {
+            switch (current_constant()) {
+                case FormatConstants::float64: {
+                    increment();
+                    auto const data = read_integral<std::uint64_t>();
+                    value = std::bit_cast<double>(data);
+                    break;
+                }
+                default: {
+                    throw std::logic_error("Unexpected value");
+                }
+            }
+        }
+
+        void unpack_type(std::string &value) {
+            std::size_t str_size = 0;
+            if (read_conditional<FormatConstants::str32, std::uint32_t>(str_size)) {
+            } else if (read_conditional<FormatConstants::str16, std::uint16_t>(str_size)) {
+            } else if (read_conditional<FormatConstants::str8, std::uint8_t>(str_size)) {
+            } else {
+                str_size = std::to_integer<std::size_t>(current() & static_cast<std::byte>(0b00011111));
+                increment();
+            }
+            if (position_ + str_size > data_.size()) {
+                throw std::out_of_range("String position is out of range");
+            }
+            value = std::string(reinterpret_cast<const char *>(data_.data() + position_), str_size);
+            increment(str_size);
+        }
+
+        void unpack_type(std::vector<std::uint8_t> &value) {
+            std::size_t bin_size = 0;
+            if (read_conditional<FormatConstants::bin32, std::uint32_t>(bin_size)) {
+            } else if (read_conditional<FormatConstants::bin16, std::uint16_t>(bin_size)) {
+            } else if (read_conditional<FormatConstants::bin8, std::uint8_t>(bin_size)) {
+            } else {
+                throw std::logic_error("Unexpected value");
+            }
+            if (position_ + bin_size > data_.size()) {
+                throw std::out_of_range("Vector position is out of range");
+            }
+            auto const *src = reinterpret_cast<std::uint8_t const *>(data_.data() + position_);
+            value.assign(src, src + bin_size);
+            increment(bin_size);
+        }
     };
-
-    template<>
-    inline void Unpacker::unpack_type(std::int8_t &value) {
-        switch (current_constant()) {
-            case FormatConstants::int8:
-                increment();
-            default:
-                value = static_cast<std::int8_t>(current());
-                increment();
-        }
-    }
-
-    template<>
-    inline void Unpacker::unpack_type(std::int16_t &value) {
-        switch (current_constant()) {
-            case FormatConstants::int16: {
-                increment();
-                auto const tmp = read_integral<std::uint16_t>();
-                value = static_cast<std::int16_t>(tmp);
-                break;
-            }
-            case FormatConstants::int8: {
-                std::int8_t val;
-                unpack_type(val);
-                value = static_cast<std::int16_t>(val);
-                break;
-            }
-            default: {
-                value = static_cast<std::int8_t>(current());
-                increment();
-                break;
-            }
-        }
-    }
-
-    template<>
-    inline void Unpacker::unpack_type(std::int32_t &value) {
-        switch (current_constant()) {
-            case FormatConstants::int32: {
-                increment();
-                auto const tmp = read_integral<std::uint32_t>();
-                value = static_cast<std::int32_t>(tmp);
-                break;
-            }
-            case FormatConstants::int16: {
-                std::int16_t val;
-                unpack_type(val);
-                value = val;
-                break;
-            }
-            case FormatConstants::int8: {
-                std::int8_t val;
-                unpack_type(val);
-                value = static_cast<std::int32_t>(val);
-                break;
-            }
-            default: {
-                value = static_cast<std::int32_t>(current());
-                increment();
-                break;
-            }
-        }
-    }
-
-    template<>
-    inline void Unpacker::unpack_type(std::int64_t &value) {
-        switch (current_constant()) {
-            case FormatConstants::int64: {
-                increment();
-                auto const tmp = read_integral<std::uint64_t>();
-                value = static_cast<std::int64_t>(tmp);
-                break;
-            }
-            case FormatConstants::int32: {
-                std::int32_t val;
-                unpack_type(val);
-                value = val;
-                break;
-            }
-            case FormatConstants::int16: {
-                std::int16_t val;
-                unpack_type(val);
-                value = val;
-                break;
-            }
-            case FormatConstants::int8: {
-                std::int8_t val;
-                unpack_type(val);
-                value = static_cast<std::int64_t>(val);
-                break;
-            }
-            default: {
-                value = static_cast<std::int64_t>(current());
-                increment();
-            }
-        }
-    }
-
-    template<>
-    inline void Unpacker::unpack_type(std::uint8_t &value) {
-        switch (current_constant()) {
-            case FormatConstants::uint8: {
-                increment();
-            }
-            default: {
-                value = std::to_integer<std::uint8_t>(current());
-                increment();
-                break;
-            }
-        }
-    }
-
-    template<>
-    inline void Unpacker::unpack_type(std::uint16_t &value) {
-        switch (current_constant()) {
-            case FormatConstants::uint16: {
-                increment();
-                value = read_integral<std::uint16_t>();
-                break;
-            }
-            case FormatConstants::uint8: {
-                increment();
-            }
-            default: {
-                value = std::to_integer<std::uint16_t>(current());
-                increment();
-                break;
-            }
-        }
-    }
-
-    template<>
-    inline void Unpacker::unpack_type(std::uint32_t &value) {
-        switch (current_constant()) {
-            case FormatConstants::uint32: {
-                increment();
-                value = read_integral<std::uint32_t>();
-                break;
-            }
-            case FormatConstants::uint16: {
-                increment();
-                value = read_integral<std::uint16_t>();
-                break;
-            }
-            case FormatConstants::uint8: {
-                increment();
-            }
-            default: {
-                value = std::to_integer<std::uint32_t>(current());
-                increment();
-                break;
-            }
-        }
-    }
-
-    template<>
-    inline void Unpacker::unpack_type(std::uint64_t &value) {
-        switch (current_constant()) {
-            case FormatConstants::uint64: {
-                increment();
-                value = read_integral<std::uint64_t>();
-                break;
-            }
-            case FormatConstants::uint32: {
-                increment();
-                value = read_integral<std::uint32_t>();
-                break;
-            }
-            case FormatConstants::uint16: {
-                increment();
-                value = read_integral<std::uint16_t>();
-                break;
-            }
-            case FormatConstants::uint8: {
-                increment();
-            }
-            default: {
-                value = std::to_integer<std::uint64_t>(current());
-                increment();
-            }
-        }
-    }
-
-    template<>
-    inline void Unpacker::unpack_type(std::nullptr_t &) {
-        switch (current_constant()) {
-            case FormatConstants::nil:
-                increment();
-                break;
-            default:
-                throw std::logic_error("Unexpected value");
-        }
-    }
-
-    template<>
-    inline void Unpacker::unpack_type(bool &value) {
-        switch (current_constant()) {
-            case FormatConstants::false_bool:
-            case FormatConstants::true_bool:
-                value = not check_constant(FormatConstants::false_bool);
-                increment();
-                break;
-            default:
-                throw std::logic_error("Unexpected value");
-        }
-    }
-
-    template<>
-    inline void Unpacker::unpack_type(float &value) {
-        switch (current_constant()) {
-            case FormatConstants::float32: {
-                increment();
-                auto const data = read_integral<std::uint32_t>();
-                value = std::bit_cast<float>(data);
-                break;
-            }
-            default: {
-                throw std::logic_error("Unexpected value");
-            }
-        }
-    }
-
-    template<>
-    inline void Unpacker::unpack_type(double &value) {
-        switch (current_constant()) {
-            case FormatConstants::float64: {
-                increment();
-                auto const data = read_integral<std::uint64_t>();
-                value = std::bit_cast<double>(data);
-                break;
-            }
-            default: {
-                throw std::logic_error("Unexpected value");
-            }
-        }
-    }
-
-    template<>
-    inline void Unpacker::unpack_type(std::string &value) {
-        std::size_t str_size = 0;
-        if (read_conditional<FormatConstants::str32, std::uint32_t>(str_size)) {
-        } else if (read_conditional<FormatConstants::str16, std::uint16_t>(str_size)) {
-        } else if (read_conditional<FormatConstants::str8, std::uint8_t>(str_size)) {
-        } else {
-            str_size = std::to_integer<std::size_t>(current() & static_cast<std::byte>(0b00011111));
-            increment();
-        }
-        if (position_ + str_size > data_.size()) {
-            throw std::out_of_range("String position is out of range");
-        }
-        value = std::string(reinterpret_cast<const char *>(data_.data() + position_), str_size);
-        increment(str_size);
-    }
-
-    template<>
-    inline void Unpacker::unpack_type(std::vector<std::uint8_t> &value) {
-        std::size_t bin_size = 0;
-        if (read_conditional<FormatConstants::bin32, std::uint32_t>(bin_size)) {
-        } else if (read_conditional<FormatConstants::bin16, std::uint16_t>(bin_size)) {
-        } else if (read_conditional<FormatConstants::bin8, std::uint8_t>(bin_size)) {
-        } else {
-            throw std::logic_error("Unexpected value");
-        }
-        if (position_ + bin_size > data_.size()) {
-            throw std::out_of_range("Vector position is out of range");
-        }
-        auto const *src = reinterpret_cast<std::uint8_t const *>(data_.data() + position_);
-        value.assign(src, src + bin_size);
-        increment(bin_size);
-    }
 
     template<typename T>
     concept UnpackableObject = requires(T t, Unpacker u)
@@ -998,7 +1038,10 @@ namespace msgpack23 {
 
     template<PackableObject PackableObject>
     [[nodiscard]] std::vector<std::byte> pack(PackableObject const &obj) {
+        Packer<true> dry_run;
+        auto _ = obj.pack(dry_run);
         Packer packer;
+        packer.reserve(dry_run.size());
         return obj.pack(packer);
     }
 
