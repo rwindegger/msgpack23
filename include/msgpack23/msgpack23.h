@@ -587,8 +587,8 @@ namespace msgpack23 {
 
         [[nodiscard]] std::size_t unpack_map_header() {
             std::size_t map_size = 0;
-            if (read_conditional<FormatConstants::map32, std::uint32_t>(map_size)) {
-            } else if (read_conditional<FormatConstants::map16, std::uint16_t>(map_size)) {
+            if (read_conditional<FormatConstants::map32, std::uint32_t>(map_size)
+                or read_conditional<FormatConstants::map16, std::uint16_t>(map_size)) {
             } else {
                 map_size = std::to_integer<std::size_t>(current() & static_cast<std::byte>(0b00001111));
                 increment();
@@ -598,8 +598,8 @@ namespace msgpack23 {
 
         [[nodiscard]] std::size_t unpack_array_header() {
             std::size_t array_size = 0;
-            if (read_conditional<FormatConstants::array32, std::uint32_t>(array_size)) {
-            } else if (read_conditional<FormatConstants::array16, std::uint16_t>(array_size)) {
+            if (read_conditional<FormatConstants::array32, std::uint32_t>(array_size)
+                or read_conditional<FormatConstants::array16, std::uint16_t>(array_size)) {
             } else {
                 array_size = std::to_integer<std::size_t>(current() & static_cast<std::byte>(0b00001111));
                 increment();
@@ -745,7 +745,7 @@ namespace msgpack23 {
                 }
                 case FormatConstants::ext8: {
                     increment();
-                    auto const _ = read_integral<std::uint8_t>();
+                    [[maybe_unused]] auto const size = read_integral<std::uint8_t>();
                     if (static_cast<std::int8_t>(current()) == -1) {
                         increment();
                         auto const nano_seconds = read_integral<std::uint32_t>();
@@ -999,9 +999,9 @@ namespace msgpack23 {
 
         void unpack_type(std::string &value) {
             std::size_t str_size = 0;
-            if (read_conditional<FormatConstants::str32, std::uint32_t>(str_size)) {
-            } else if (read_conditional<FormatConstants::str16, std::uint16_t>(str_size)) {
-            } else if (read_conditional<FormatConstants::str8, std::uint8_t>(str_size)) {
+            if (read_conditional<FormatConstants::str32, std::uint32_t>(str_size)
+                or read_conditional<FormatConstants::str16, std::uint16_t>(str_size)
+                or read_conditional<FormatConstants::str8, std::uint8_t>(str_size)) {
             } else {
                 str_size = std::to_integer<std::size_t>(current() & static_cast<std::byte>(0b00011111));
                 increment();
@@ -1015,9 +1015,9 @@ namespace msgpack23 {
 
         void unpack_type(std::vector<std::uint8_t> &value) {
             std::size_t bin_size = 0;
-            if (read_conditional<FormatConstants::bin32, std::uint32_t>(bin_size)) {
-            } else if (read_conditional<FormatConstants::bin16, std::uint16_t>(bin_size)) {
-            } else if (read_conditional<FormatConstants::bin8, std::uint8_t>(bin_size)) {
+            if (read_conditional<FormatConstants::bin32, std::uint32_t>(bin_size)
+                or read_conditional<FormatConstants::bin16, std::uint16_t>(bin_size)
+                or read_conditional<FormatConstants::bin8, std::uint8_t>(bin_size)) {
             } else {
                 throw std::logic_error("Unexpected value");
             }
