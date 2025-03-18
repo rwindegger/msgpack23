@@ -72,5 +72,8 @@ export(
 )
 export(PACKAGE msgpack23)
 
-enable_testing()
-add_subdirectory(tests)
+option(BUILD_TESTING "..." ON)
+if (BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(tests)
+endif ()
