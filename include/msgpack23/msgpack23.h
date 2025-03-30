@@ -214,7 +214,7 @@ namespace msgpack23 {
         }
 
         template<CollectionLike T>
-            requires MapLike<T> && (!EnumLike<T>)
+            requires MapLike<T> and (!EnumLike<T>)
         void pack_type(T const &value) {
             if (!pack_map_header(value.size())) {
                 throw std::length_error("Map is too long to be serialized.");
@@ -226,7 +226,7 @@ namespace msgpack23 {
         }
 
         template<CollectionLike T>
-            requires (!MapLike<T>) && (!EnumLike<T>)
+            requires (!MapLike<T>) and (!EnumLike<T>)
         void pack_type(T const &value) {
             if (!pack_array_header(value.size())) {
                 throw std::length_error("Collection is too long to be serialized.");
@@ -287,7 +287,7 @@ namespace msgpack23 {
         }
 
         template<typename T>
-            requires (!CollectionLike<T>) && (!MapLike<T>) && (!EnumLike<T>) && (!VariantLike<T>)
+            requires (!CollectionLike<T>) and (!MapLike<T>) and (!EnumLike<T>) and (!VariantLike<T>)
         void pack_type(T const &value) {
             value.pack(*this);
         }
@@ -340,7 +340,7 @@ namespace msgpack23 {
         }
 
         void pack_type(std::int8_t const &value) {
-            if (value > 31 || value < -32) {
+            if (value > 31 or value < -32) {
                 emplace_constant(FormatConstants::int8);
             }
             if constexpr (IsDryRun) {
@@ -608,7 +608,7 @@ namespace msgpack23 {
         }
 
         template<MapLike T>
-            requires CollectionLike<T> && (!EnumLike<T>)
+            requires CollectionLike<T> and (!EnumLike<T>)
         void unpack_type(T &value) {
             using KeyType = typename T::key_type;
             using ValueType = typename T::mapped_type;
@@ -623,7 +623,7 @@ namespace msgpack23 {
         }
 
         template<CollectionLike T>
-            requires (!MapLike<T>) && EmplaceAvailable<T> && (!EnumLike<T>)
+            requires (!MapLike<T>) and EmplaceAvailable<T> and (!EnumLike<T>)
         void unpack_type(T &value) {
             using ValueType = typename T::value_type;
             auto const array_size = unpack_array_header();
@@ -635,7 +635,7 @@ namespace msgpack23 {
         }
 
         template<CollectionLike T>
-            requires (!MapLike<T>) && (!EmplaceAvailable<T>) && (!EnumLike<T>)
+            requires (!MapLike<T>) and (!EmplaceAvailable<T>) and (!EnumLike<T>)
         void unpack_type(T &value) {
             using ValueType = typename T::value_type;
             std::vector<ValueType> vec;
@@ -690,7 +690,7 @@ namespace msgpack23 {
             }
             auto const index = static_cast<std::int8_t>(read_integral<std::uint8_t>());
 
-            if (index < 0 || index > static_cast<std::int8_t>(std::variant_size_v<T> - 1)) {
+            if (index < 0 or index > static_cast<std::int8_t>(std::variant_size_v<T> - 1)) {
                 throw std::out_of_range("Invalid variant index");
             }
 
@@ -706,7 +706,7 @@ namespace msgpack23 {
         }
 
         template<typename T>
-            requires (!CollectionLike<T>) && (!MapLike<T>) && (!EnumLike<T>) && (!VariantLike<T>)
+            requires (!CollectionLike<T>) and (!MapLike<T>) and (!EnumLike<T>) and (!VariantLike<T>)
         void unpack_type(T &value) {
             value.unpack(*this);
         }
