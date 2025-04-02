@@ -92,7 +92,6 @@ namespace msgpack23 {
     template<typename T>
     concept EmplaceAvailable = requires(T t, typename T::value_type val)
     {
-        // Simply require that calling t.emplace_back(val) is valid
         t.emplace_back(val);
     };
 
