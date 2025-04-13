@@ -1,4 +1,6 @@
-# msgpack23  
+# msgpack23
+[![Conan Center](https://img.shields.io/conan/v/msgpack23)](https://conan.io/center/recipes/msgpack23)
+
 A modern, header-only C++ library for MessagePack serialization and deserialization.
 
 ## Overview
