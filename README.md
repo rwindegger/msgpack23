@@ -25,7 +25,7 @@ msgpack23 is a lightweight library that provides a straightforward approach to s
 2. **Include the Header**  
    Since this is a header-only library, just include the main header in your project:
    ```cpp
-   #include "msgpack23.hpp"
+   #include "msgpack23.h"
    ```
 
 3. **Pack and Unpack**
