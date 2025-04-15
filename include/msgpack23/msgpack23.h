@@ -438,7 +438,7 @@ namespace msgpack23 {
         { t.pack(p) };
     };
 
-    class Unpacker {
+    class Unpacker final {
     public:
         Unpacker() : data_() {
         }
