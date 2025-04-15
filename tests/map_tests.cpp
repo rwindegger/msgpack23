@@ -15,8 +15,10 @@ namespace {
         for (std::size_t i = 0; i < GetParam(); ++i) {
             expected.insert_or_assign(i, i);
         }
-        msgpack23::Packer packer{};
-        auto data = packer(expected);
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::Packer packer{inserter};
+        packer(expected);
         msgpack23::Unpacker unpacker{data};
         std::map<std::size_t, std::size_t> actual{};
         unpacker(actual);

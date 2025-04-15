@@ -14,8 +14,10 @@ namespace {
         for (std::size_t i = 0; i < GetParam(); ++i) {
             expected.emplace_back(i);
         }
-        msgpack23::Packer packer{};
-        auto data = packer(expected);
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::Packer packer{inserter};
+        packer(expected);
         msgpack23::Unpacker unpacker{data};
         std::vector<std::size_t> actual{};
         unpacker(actual);
@@ -27,8 +29,10 @@ namespace {
         for (std::size_t i = 0; i < GetParam(); ++i) {
             expected.emplace_back(42U);
         }
-        msgpack23::Packer packer{};
-        auto data = packer(expected);
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::Packer packer{inserter};
+        packer(expected);
         msgpack23::Unpacker unpacker{data};
         std::vector<std::uint8_t> actual{};
         unpacker(actual);

@@ -10,9 +10,11 @@ namespace {
     };
 
     TEST_P(msgpack23_time_point, int8Test) {
-        msgpack23::Packer packer{};
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::Packer packer{inserter};
         auto const expected = GetParam();
-        auto const data = packer(expected);
+        packer(expected);
         msgpack23::Unpacker unpacker{data};
         std::chrono::system_clock::time_point actual{};
         unpacker(actual);

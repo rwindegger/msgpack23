@@ -20,8 +20,8 @@ namespace {
         std::tuple<int, std::string> tuple;
 
         template<class T>
-        std::vector<std::byte> pack(T &packer) const {
-            return packer(names, values, tuple);
+        void pack(T &packer) const {
+            packer(names, values, tuple);
         }
 
         template<class T>
@@ -43,8 +43,8 @@ namespace {
         NestedStruct nestedStruct;
 
         template<class T>
-        std::vector<std::byte> pack(T &packer) const {
-            return packer(int64, uint32, float32, double64, string, data, map, testEnum, time_point, nestedStruct);
+        void pack(T &packer) const {
+            packer(int64, uint32, float32, double64, string, data, map, testEnum, time_point, nestedStruct);
         }
 
         template<class T>
@@ -78,7 +78,9 @@ namespace {
                 {42, "The answer to everything"},
             }
         };
-        auto data = msgpack23::pack(test);
+        std::vector<std::byte> data{};
+        auto inserter = std::back_insert_iterator(data);
+        msgpack23::pack(inserter, test);
         auto obj = msgpack23::unpack<TestStruct>(data);
 
         EXPECT_EQ(obj.int64, test.int64);
@@ -100,8 +102,8 @@ namespace {
         std::string my_string;
 
         template<typename T>
-        std::vector<std::byte> pack(T &packer) const {
-            return packer(my_integer, my_string);
+        void pack(T &packer) const {
+            packer(my_integer, my_string);
         }
 
         template<typename T>
@@ -112,7 +114,9 @@ namespace {
 
     TEST(msgpack23, SimpleObjectPacking) {
         MyData const my_data{42, "Hello"};
-        auto const data = msgpack23::pack(my_data);
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::pack(inserter, my_data);
         auto obj = msgpack23::unpack<MyData>(data);
     }
 }

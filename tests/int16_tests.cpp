@@ -14,8 +14,8 @@ namespace {
         std::int16_t int16;
 
         template<class T>
-        std::vector<std::byte> pack(T &packer) const {
-            return packer(int16);
+        void pack(T &packer) const {
+            packer(int16);
         }
 
         template<class T>
@@ -28,7 +28,9 @@ namespace {
         Int16Struct const testIntStruct{
             GetParam()
         };
-        auto const data = msgpack23::pack(testIntStruct);
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::pack(inserter, testIntStruct);
         auto [actual] = msgpack23::unpack<Int16Struct>(data);
         EXPECT_EQ(actual, GetParam());
     }
@@ -49,9 +51,11 @@ namespace {
 
     TEST(msgpack23, int16Packing) {
         for (std::int16_t i = -10; i < 10; ++i) {
-            msgpack23::Packer packer{};
+            std::vector<std::byte> data{};
+            auto const inserter = std::back_insert_iterator(data);
+            msgpack23::Packer packer{inserter};
             auto const expected = static_cast<std::int16_t>(i * (std::numeric_limits<std::int16_t>::max() / 10));
-            auto data = packer(expected);
+            packer(expected);
             msgpack23::Unpacker unpacker{data};
             std::int16_t actual{};
             unpacker(actual);

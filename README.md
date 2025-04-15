@@ -35,23 +35,25 @@ msgpack23 is a lightweight library that provides a straightforward approach to s
    #include "msgpack23.hpp"
    
    int main() {
-       // Create a map of some data
-       std::map<std::string, int> original {{"apple", 1}, {"banana", 2}};
-       
-       // 1) Pack into a vector of std::byte
-       msgpack23::Packer packer;
-       auto packedData = packer(original); 
-       
-       // 2) Unpack back into a map
-       std::map<std::string, int> unpacked;
-       msgpack23::Unpacker unpacker(packedData);
-       unpacker(unpacked);
-       
-       // Verify the result
-       for (auto const& [key, value] : unpacked) {
-           std::cout << key << ": " << value << "\n";
-       }
-       return 0;
+      // Create a map of some data
+      std::map<std::string, int> original {{"apple", 1}, {"banana", 2}};
+   
+      // 1) Pack into a vector of std::byte
+      std::vector<std::byte> packedData{};
+      auto const inserter = std::back_insert_iterator(packedData);
+      msgpack23::Packer packer{inserter};
+      packer(original); 
+   
+      // 2) Unpack back into a map
+      std::map<std::string, int> unpacked;
+      msgpack23::Unpacker unpacker(packedData);
+      unpacker(unpacked);
+   
+      // Verify the result
+      for (auto const& [key, value] : unpacked) {
+         std::cout << key << ": " << value << "\n";
+      }
+      return 0;
    }
    ```
 
@@ -65,8 +67,8 @@ struct MyData {
    std::string my_string;
    
    template<typename T>
-   std::vector<std::byte> pack(T &packer) const {
-      return packer(my_integer, my_string);
+   void pack(T &packer) const {
+      packer(my_integer, my_string);
    }
    
    template<typename T>
@@ -79,7 +81,9 @@ struct MyData {
 Now you can use `MyData` with `msgpack23` just like any built-in type:
 ```cpp
 MyData const my_data {42, "Hello" };
-auto const data = msgpack23::pack(my_data);
+std::vector<std::byte> data{};
+auto const inserter = std::back_insert_iterator(data);
+msgpack23::pack(my_data);
 auto obj = msgpack23::unpack<MyData>(data);
 ```
 

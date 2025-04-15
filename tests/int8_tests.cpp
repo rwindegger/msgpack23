@@ -14,8 +14,8 @@ namespace {
         std::int8_t int8;
 
         template<class T>
-        std::vector<std::byte> pack(T &packer) const {
-            return packer(int8);
+        void pack(T &packer) const {
+            packer(int8);
         }
 
         template<class T>
@@ -28,7 +28,9 @@ namespace {
         Int8Struct const testIntStruct{
             GetParam()
         };
-        auto const data = msgpack23::pack(testIntStruct);
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::pack(inserter, testIntStruct);
         auto [actual] = msgpack23::unpack<Int8Struct>(data);
         EXPECT_EQ(actual, GetParam());
     }
@@ -40,9 +42,11 @@ namespace {
 
     TEST(msgpack23, int8Packing) {
         for (std::int8_t i = -10; i < 10; ++i) {
-            msgpack23::Packer packer {};
+            std::vector<std::byte> data{};
+            auto const inserter = std::back_insert_iterator(data);
+            msgpack23::Packer packer{inserter};
             auto const expected = static_cast<std::int8_t>(i * (std::numeric_limits<std::int8_t>::max() / 10));
-            auto data = packer(expected);
+            packer(expected);
             msgpack23::Unpacker unpacker {data};
             std::int8_t actual {};
             unpacker(actual);

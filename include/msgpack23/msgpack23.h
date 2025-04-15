@@ -9,6 +9,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstring>
+#include <iterator>
 #include <span>
 #include <string>
 #include <type_traits>
@@ -126,48 +127,29 @@ namespace msgpack23 {
         return to_big_endian(value);
     }
 
-    template<bool IsDryRun = false>
-    class Packer {
+    template<std::output_iterator<std::byte> Iter>
+    class Packer final {
     public:
-        template<class... Types>
-        [[nodiscard]] std::vector<std::byte> operator()(Types const &... args) {
+        template<typename... Types>
+        void operator()(Types const &... args) {
             (pack_type(args), ...);
-            return data_;
         }
 
-        [[nodiscard]] std::size_t size() const noexcept {
-            if constexpr (IsDryRun) {
-                return required_size_;
-            } else {
-                return data_.size();
-            }
-        }
-
-        void reserve(std::size_t const size) noexcept {
-            data_.reserve(size);
+        [[nodiscard]] explicit Packer(Iter store) : store_{store} {
         }
 
     private:
-        std::vector<std::byte> data_;
-        std::size_t required_size_ = 0;
+        Iter store_;
 
         void emplace_constant(FormatConstants const &value) {
-            if constexpr (IsDryRun) {
-                required_size_ += sizeof(FormatConstants);
-            } else {
-                data_.emplace_back(static_cast<std::byte>(std::to_underlying(value)));
-            }
+            *store_++ = static_cast<std::byte>(std::to_underlying(value));
         }
 
         template<std::integral T>
         void emplace_integral(T const &value) {
-            if constexpr (IsDryRun) {
-                required_size_ += sizeof(T);
-            } else {
-                auto const serialize_value = to_big_endian(value);
-                auto const bytes = std::bit_cast<std::array<std::byte, sizeof(serialize_value)> >(serialize_value);
-                data_.insert(data_.end(), bytes.begin(), bytes.end());
-            }
+            auto const serialize_value = to_big_endian(value);
+            auto const bytes = std::bit_cast<std::array<std::byte, sizeof(serialize_value)> >(serialize_value);
+            std::copy(bytes.begin(), bytes.end(), store_);
         }
 
         template<std::integral T>
@@ -178,12 +160,8 @@ namespace msgpack23 {
 
         [[nodiscard]] bool pack_map_header(std::size_t const n) {
             if (n < 16) {
-                if constexpr (IsDryRun) {
-                    required_size_ += 1;
-                } else {
-                    constexpr auto size_mask = static_cast<std::byte>(0b10000000);
-                    data_.emplace_back(static_cast<std::byte>(n) | size_mask);
-                }
+                constexpr auto size_mask = static_cast<std::byte>(0b10000000);
+                *store_++ = static_cast<std::byte>(n) | size_mask;
             } else if (n < std::numeric_limits<std::uint16_t>::max()) {
                 emplace_combined(FormatConstants::map16, static_cast<std::uint16_t>(n));
             } else if (n < std::numeric_limits<std::uint32_t>::max()) {
@@ -196,12 +174,8 @@ namespace msgpack23 {
 
         [[nodiscard]] bool pack_array_header(std::size_t const n) {
             if (n < 16) {
-                if constexpr (IsDryRun) {
-                    required_size_ += 1;
-                } else {
-                    constexpr auto size_mask = static_cast<std::byte>(0b10010000);
-                    data_.emplace_back(static_cast<std::byte>(n) | size_mask);
-                }
+                constexpr auto size_mask = static_cast<std::byte>(0b10010000);
+                *store_++ = static_cast<std::byte>(n) | size_mask;
             } else if (n < std::numeric_limits<std::uint16_t>::max()) {
                 emplace_combined(FormatConstants::array16, static_cast<std::uint16_t>(n));
             } else if (n < std::numeric_limits<std::uint32_t>::max()) {
@@ -245,14 +219,9 @@ namespace msgpack23 {
         void pack_type(T const &value) {
             std::vector<std::byte> data{};
             std::visit([this, &data](auto const &arg) {
-                if constexpr (IsDryRun) {
-                    Packer<IsDryRun> packer{};
-                    packer(arg);
-                    required_size_ += packer.size();
-                } else {
-                    Packer packer{};
-                    data = packer(arg);
-                }
+                auto const inserter = std::back_insert_iterator(data);
+                Packer packer{inserter};
+                packer(arg);
             }, value);
             auto const index = static_cast<std::int8_t>(value.index());
             if (index > 127) {
@@ -279,10 +248,7 @@ namespace msgpack23 {
                 throw std::length_error("Variant is too long to be serialized.");
             }
             emplace_integral(index);
-
-            if constexpr (not IsDryRun) {
-                data_.insert(data_.end(), data.begin(), data.end());
-            }
+            std::copy(data.begin(), data.end(), store_);
         }
 
         template<typename T>
@@ -342,11 +308,7 @@ namespace msgpack23 {
             if (value > 31 or value < -32) {
                 emplace_constant(FormatConstants::int8);
             }
-            if constexpr (IsDryRun) {
-                required_size_ += 1;
-            } else {
-                data_.emplace_back(static_cast<std::byte>(value));
-            }
+            *store_++ = static_cast<std::byte>(value);
         }
 
         void pack_type(std::int16_t const &value) {
@@ -384,18 +346,10 @@ namespace msgpack23 {
 
         void pack_type(std::uint8_t const &value) {
             if (value < 0x80) {
-                if constexpr (IsDryRun) {
-                    required_size_ += 1;
-                } else {
-                    data_.emplace_back(static_cast<std::byte>(value));
-                }
+                *store_++ = static_cast<std::byte>(value);
             } else {
                 emplace_constant(FormatConstants::uint8);
-                if constexpr (IsDryRun) {
-                    required_size_ += 1;
-                } else {
-                    data_.emplace_back(static_cast<std::byte>(value));
-                }
+                *store_++ = static_cast<std::byte>(value);
             }
         }
 
@@ -446,18 +400,10 @@ namespace msgpack23 {
 
         void pack_type(std::string const &value) {
             if (value.size() < 32) {
-                if constexpr (IsDryRun) {
-                    required_size_ += 1;
-                } else {
-                    data_.emplace_back(static_cast<std::byte>(value.size()) | static_cast<std::byte>(0b10100000));
-                }
+                *store_++ = static_cast<std::byte>(value.size()) | static_cast<std::byte>(0b10100000);
             } else if (value.size() < std::numeric_limits<std::uint8_t>::max()) {
                 emplace_constant(FormatConstants::str8);
-                if constexpr (IsDryRun) {
-                    required_size_ += 1;
-                } else {
-                    data_.emplace_back(static_cast<std::byte>(value.size()));
-                }
+                *store_++ = static_cast<std::byte>(value.size());
             } else if (value.size() < std::numeric_limits<std::uint16_t>::max()) {
                 emplace_combined(FormatConstants::str16, static_cast<std::uint16_t>(value.size()));
             } else if (value.size() < std::numeric_limits<std::uint32_t>::max()) {
@@ -466,25 +412,14 @@ namespace msgpack23 {
                 throw std::length_error("String is too long to be serialized.");
             }
 
-            if constexpr (IsDryRun) {
-                required_size_ += value.size();
-            } else {
-                data_.insert(
-                    data_.end(),
-                    reinterpret_cast<const std::byte *>(value.data()),
-                    reinterpret_cast<const std::byte *>(value.data()) + value.size()
-                );
-            }
+            std::copy(reinterpret_cast<std::byte const * const>(value.data()),
+                      reinterpret_cast<std::byte const * const>(value.data() + value.size()), store_);
         }
 
         void pack_type(std::vector<std::uint8_t> const &value) {
             if (value.size() < std::numeric_limits<std::uint8_t>::max()) {
                 emplace_constant(FormatConstants::bin8);
-                if constexpr (IsDryRun) {
-                    required_size_ += 1;
-                } else {
-                    data_.emplace_back(static_cast<std::byte>(value.size()));
-                }
+                *store_++ = static_cast<std::byte>(value.size());
             } else if (value.size() < std::numeric_limits<std::uint16_t>::max()) {
                 emplace_combined(FormatConstants::bin16, static_cast<std::uint16_t>(value.size()));
             } else if (value.size() < std::numeric_limits<std::uint32_t>::max()) {
@@ -492,23 +427,15 @@ namespace msgpack23 {
             } else {
                 throw std::length_error("Vector is too long to be serialized.");
             }
-
-            if constexpr (IsDryRun) {
-                required_size_ += value.size();
-            } else {
-                data_.insert(
-                    data_.end(),
-                    reinterpret_cast<const std::byte *>(value.data()),
-                    reinterpret_cast<const std::byte *>(value.data()) + value.size()
-                );
-            }
+            std::copy(reinterpret_cast<std::byte const * const>(value.data()),
+                      reinterpret_cast<std::byte const * const>(value.data() + value.size()), store_);
         }
     };
 
-    template<typename T>
-    concept PackableObject = requires(T t, Packer<> p)
+    template<typename T, typename P>
+    concept PackableObject = requires(T t, P p)
     {
-        { t.pack(p) } -> std::same_as<std::vector<std::byte> >;
+        { t.pack(p) };
     };
 
     class Unpacker {
@@ -516,7 +443,7 @@ namespace msgpack23 {
         Unpacker() : data_() {
         }
 
-        explicit Unpacker(std::span<std::byte const> data) : data_(data) {
+        explicit Unpacker(std::span<std::byte const> const data) : data_(data) {
         }
 
         template<typename... Types>
@@ -1035,12 +962,9 @@ namespace msgpack23 {
         t.unpack(u);
     };
 
-    template<PackableObject PackableObject>
-    [[nodiscard]] std::vector<std::byte> pack(PackableObject const &obj) {
-        Packer<true> dry_run;
-        auto _ = obj.pack(dry_run);
-        Packer packer;
-        packer.reserve(dry_run.size());
+    template<std::output_iterator<std::byte> Iter, PackableObject<Packer<Iter> > PackableObject>
+    void pack(Iter iterator, PackableObject const &obj) {
+        Packer<Iter> packer{iterator};
         return obj.pack(packer);
     }
 

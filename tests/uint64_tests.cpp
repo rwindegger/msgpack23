@@ -13,8 +13,8 @@ namespace {
         std::uint64_t uint64;
 
         template<class T>
-        std::vector<std::byte> pack(T &packer) const {
-            return packer(uint64);
+        void pack(T &packer) const {
+            packer(uint64);
         }
 
         template<class T>
@@ -27,7 +27,9 @@ namespace {
         UInt64Struct const testIntStruct{
             GetParam()
         };
-        auto const data = msgpack23::pack(testIntStruct);
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::pack(inserter, testIntStruct);
         auto [uint64] = msgpack23::unpack<UInt64Struct>(data);
         EXPECT_EQ(uint64, GetParam());
     }
@@ -52,10 +54,12 @@ namespace {
     TEST(msgpack23, uint64Packing) {
         constexpr auto iterations = 200U;
         for (std::uint64_t i = 0; i < iterations; ++i) {
-            msgpack23::Packer packer{};
+            std::vector<std::byte> data{};
+            auto const inserter = std::back_insert_iterator(data);
+            msgpack23::Packer packer{inserter};
             auto const expected = static_cast<std::uint64_t>(
                 i * (std::numeric_limits<std::uint64_t>::max() / iterations));
-            auto data = packer(expected);
+            packer(expected);
             msgpack23::Unpacker unpacker{data};
             std::uint64_t actual{};
             unpacker(actual);

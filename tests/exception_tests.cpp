@@ -9,89 +9,109 @@
 namespace {
     TEST(msgpack23, MapTooLargeTest) {
         GTEST_SKIP() << "Required map is to large for memory";
-        msgpack23::Packer packer{};
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::Packer packer{inserter};
         std::map<std::size_t, std::size_t> expected{};
         for (std::map<std::size_t, std::size_t>::size_type i = 0;
              i < static_cast<std::map<std::size_t, std::size_t>::size_type>(std::numeric_limits<std::uint32_t>::max()) +
              1; ++i) {
             expected.insert(std::make_pair(i, i));
         }
-        EXPECT_THROW(auto _ = packer(expected), std::length_error);
+        EXPECT_THROW(packer(expected), std::length_error);
     }
 
     TEST(msgpack23, CollectionTooLargeTest) {
         GTEST_SKIP() << "Required collection is to large for memory";
-        msgpack23::Packer packer{};
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::Packer packer{inserter};
         std::vector<std::size_t> expected{};
         expected.resize(
             static_cast<std::vector<std::size_t>::size_type>(std::numeric_limits<std::uint32_t>::max()) + 1);
-        EXPECT_THROW(auto _ = packer(expected), std::length_error);
+        EXPECT_THROW(packer(expected), std::length_error);
     }
 
     TEST(msgpack23, StringTooLargeTest) {
-        msgpack23::Packer packer{};
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::Packer packer{inserter};
         std::string expected{};
         expected.resize(static_cast<std::string::size_type>(std::numeric_limits<std::uint32_t>::max()) + 1);
-        EXPECT_THROW(auto _ = packer(expected), std::length_error);
+        EXPECT_THROW(packer(expected), std::length_error);
     }
 
     TEST(msgpack23, VectorTooLargeTest) {
-        msgpack23::Packer packer{};
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::Packer packer{inserter};
         std::vector<std::uint8_t> expected{};
         expected.resize(
             static_cast<std::vector<std::uint8_t>::size_type>(std::numeric_limits<std::uint32_t>::max()) + 1);
-        EXPECT_THROW(auto _ = packer(expected), std::length_error);
+        EXPECT_THROW(packer(expected), std::length_error);
     }
 
     TEST(msgpack23, WrongFormatForNullPtrTest) {
-        msgpack23::Packer packer{};
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::Packer packer{inserter};
         constexpr double expected{3.1415};
-        auto const data = packer(expected);
+        packer(expected);
         std::nullptr_t actual;
         msgpack23::Unpacker unpacker{};
         EXPECT_THROW(unpacker(actual), std::logic_error);
     }
 
     TEST(msgpack23, WrongFormatForBoolTest) {
-        msgpack23::Packer packer{};
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::Packer packer{inserter};
         constexpr double expected{3.1415};
-        auto const data = packer(expected);
+        packer(expected);
         bool actual;
         msgpack23::Unpacker unpacker{};
         EXPECT_THROW(unpacker(actual), std::logic_error);
     }
 
     TEST(msgpack23, WrongFormatForFloatTest) {
-        msgpack23::Packer packer{};
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::Packer packer{inserter};
         constexpr double expected{3.1415};
-        auto const data = packer(expected);
+        packer(expected);
         float actual{};
         msgpack23::Unpacker unpacker{data};
         EXPECT_THROW(unpacker(actual), std::logic_error);
     }
 
     TEST(msgpack23, WrongFormatForDoubleTest) {
-        msgpack23::Packer packer{};
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::Packer packer{inserter};
         constexpr float expected{3.1415F};
-        auto const data = packer(expected);
+        packer(expected);
         double actual{};
         msgpack23::Unpacker unpacker{data};
         EXPECT_THROW(unpacker(actual), std::logic_error);
     }
 
     TEST(msgpack23, WrongFormatForTimeStampTest) {
-        msgpack23::Packer packer{};
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::Packer packer{inserter};
         constexpr std::uint64_t expected{std::numeric_limits<std::uint64_t>::max()};
-        auto const data = packer(expected);
+        packer(expected);
         std::chrono::system_clock::time_point actual{};
         msgpack23::Unpacker unpacker{data};
         EXPECT_THROW(unpacker(actual), std::logic_error);
     }
 
     TEST(msgpack23, WrongFormatForByteArrayTest) {
-        msgpack23::Packer packer{};
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::Packer packer{inserter};
         constexpr std::uint64_t expected{std::numeric_limits<std::uint64_t>::max()};
-        auto const data = packer(expected);
+        packer(expected);
         std::vector<std::uint8_t> actual{};
         msgpack23::Unpacker unpacker{data};
         EXPECT_THROW(unpacker(actual), std::logic_error);
