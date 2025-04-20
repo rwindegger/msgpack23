@@ -127,6 +127,38 @@ namespace msgpack23 {
         return to_big_endian(value);
     }
 
+    template<typename T>
+    class counting_inserter final {
+    public:
+        using difference_type = std::ptrdiff_t;
+
+        constexpr explicit counting_inserter(std::size_t &size) : size_(std::addressof(size)) {}
+
+        constexpr counting_inserter &operator=(const T &value) {
+            ++*size_;
+            return *this;
+        }
+
+        constexpr counting_inserter &operator=(T &&value) {
+            ++*size_;
+            return *this;
+        }
+
+        [[nodiscard]] constexpr counting_inserter &operator*() {
+            return *this;
+        }
+
+        constexpr counting_inserter &operator++() {
+            return *this;
+        }
+
+        constexpr counting_inserter operator++(int) {
+            return *this;
+        }
+    private:
+        std::size_t *size_{};
+    };
+
     template<std::output_iterator<std::byte> Iter>
     class Packer final {
     public:
@@ -217,38 +249,42 @@ namespace msgpack23 {
         template<typename T>
             requires VariantLike<T>
         void pack_type(T const &value) {
-            std::vector<std::byte> data{};
-            std::visit([this, &data](auto const &arg) {
-                auto const inserter = std::back_insert_iterator(data);
-                Packer packer{inserter};
+            std::size_t size = 0;
+            std::visit([this, &size](auto const &arg) {
+                const auto inserter = counting_inserter<std::byte>{size};
+                Packer<counting_inserter<std::byte> > packer{inserter};
                 packer(arg);
             }, value);
+
             auto const index = static_cast<std::int8_t>(value.index());
             if (index > 127) {
                 throw std::overflow_error("Variant index is to large to be serialized.");
             }
 
-            if (data.size() == 1) {
+            if (size == 1) {
                 emplace_constant(FormatConstants::fixext1);
-            } else if (data.size() == 2) {
+            } else if (size == 2) {
                 emplace_constant(FormatConstants::fixext2);
-            } else if (data.size() == 4) {
+            } else if (size == 4) {
                 emplace_constant(FormatConstants::fixext4);
-            } else if (data.size() == 8) {
+            } else if (size == 8) {
                 emplace_constant(FormatConstants::fixext8);
-            } else if (data.size() == 16) {
+            } else if (size == 16) {
                 emplace_constant(FormatConstants::fixext16);
-            } else if (data.size() < std::numeric_limits<std::uint8_t>::max()) {
-                emplace_combined(FormatConstants::ext8, static_cast<std::uint8_t>(data.size()));
-            } else if (data.size() < std::numeric_limits<std::uint16_t>::max()) {
-                emplace_combined(FormatConstants::ext16, static_cast<std::uint16_t>(data.size()));
-            } else if (data.size() < std::numeric_limits<std::uint32_t>::max()) {
-                emplace_combined(FormatConstants::ext32, static_cast<std::uint32_t>(data.size()));
+            } else if (size < std::numeric_limits<std::uint8_t>::max()) {
+                emplace_combined(FormatConstants::ext8, static_cast<std::uint8_t>(size));
+            } else if (size < std::numeric_limits<std::uint16_t>::max()) {
+                emplace_combined(FormatConstants::ext16, static_cast<std::uint16_t>(size));
+            } else if (size < std::numeric_limits<std::uint32_t>::max()) {
+                emplace_combined(FormatConstants::ext32, static_cast<std::uint32_t>(size));
             } else {
                 throw std::length_error("Variant is too long to be serialized.");
             }
             emplace_integral(index);
-            std::copy(data.begin(), data.end(), store_);
+            std::visit([this](auto const &arg) {
+                Packer packer{store_};
+                packer(arg);
+            }, value);
         }
 
         template<typename T>
