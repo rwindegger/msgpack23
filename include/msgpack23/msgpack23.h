@@ -452,7 +452,7 @@ namespace msgpack23 {
                       reinterpret_cast<std::byte const * const>(value.data() + value.size()), store_);
         }
 
-        void pack_type(std::vector<std::uint8_t> const &value) {
+        void pack_type(std::vector<std::byte> const &value) {
             if (value.size() < std::numeric_limits<std::uint8_t>::max()) {
                 emplace_constant(FormatConstants::bin8);
                 *store_++ = static_cast<std::byte>(value.size());
@@ -975,7 +975,7 @@ namespace msgpack23 {
             increment(str_size);
         }
 
-        void unpack_type(std::vector<std::uint8_t> &value) {
+        void unpack_type(std::vector<std::byte> &value) {
             std::size_t bin_size = 0;
             if (read_conditional<FormatConstants::bin32, std::uint32_t>(bin_size)
                 or read_conditional<FormatConstants::bin16, std::uint16_t>(bin_size)
