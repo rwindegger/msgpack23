@@ -986,7 +986,7 @@ namespace msgpack23 {
             if (position_ + bin_size > data_.size()) {
                 throw std::out_of_range("Vector position is out of range");
             }
-            auto const *src = reinterpret_cast<std::uint8_t const *>(data_.data() + position_);
+            auto const *src = reinterpret_cast<std::byte const *>(data_.data() + position_);
             value.assign(src, src + bin_size);
             increment(bin_size);
         }
