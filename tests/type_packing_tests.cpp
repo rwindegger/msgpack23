@@ -154,7 +154,10 @@ namespace {
         std::vector<std::byte> data{};
         auto const inserter = std::back_insert_iterator(data);
         msgpack23::Packer packer{inserter};
-        std::vector<std::uint8_t> const expected{1, 2, 3, 4};
+        std::vector<std::byte> const expected{
+            static_cast<std::byte>(1), static_cast<std::byte>(2),
+            static_cast<std::byte>(3), static_cast<std::byte>(4)
+        };
         std::vector<std::byte> const expected_data{
             static_cast<std::byte>(0xc4),
             static_cast<std::byte>(4),
@@ -166,7 +169,7 @@ namespace {
         packer(expected);
         EXPECT_EQ(data, expected_data);
         msgpack23::Unpacker unpacker{data};
-        std::vector<std::uint8_t> actual{};
+        std::vector<std::byte> actual{};
         unpacker(actual);
         EXPECT_EQ(expected, actual);
     }
