@@ -77,3 +77,8 @@ if (BUILD_TESTING)
     enable_testing()
     add_subdirectory(tests)
 endif ()
+
+option(BUILD_EXAMPLES "..." ON)
+if (BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
