@@ -505,7 +505,7 @@ namespace msgpack23 {
 
         [[nodiscard]] std::byte current() const {
             if (position_ < data_.size()) {
-                return std::byte{ data_[position_] };
+                return static_cast<std::byte>(data_[position_]);
             }
             throw std::out_of_range("Unpacker doesn't have enough data.");
         }
