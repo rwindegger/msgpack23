@@ -161,10 +161,11 @@ namespace msgpack23 {
     };
 
     template<typename T>
-    concept byte_type = std::same_as<T, std::byte> ||
-        std::same_as<T, char> ||
-        std::same_as<T, unsigned char> ||
-        std::same_as<T, std::uint8_t>;
+    concept byte_type = std::same_as<T, std::byte>
+    or std::same_as<T, char>
+    or std::same_as<T, unsigned char>
+    or std::same_as<T, std::uint8_t>
+    or std::same_as<T, std::int8_t>;
 
     template<byte_type B, std::output_iterator<B> Iter>
     class Packer final {

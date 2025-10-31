@@ -184,4 +184,48 @@ namespace {
         EXPECT_EQ(obj.nestedStruct.values, test.nestedStruct.values);
         EXPECT_EQ(obj.nestedStruct.tuple, test.nestedStruct.tuple);
     }
+
+    TEST(msgpack23, int8_tNestedObjectPacking) {
+        std::map<std::string, std::string> map;
+        map.insert(std::pair<std::string, std::string>("first", "hello"));
+        map.insert(std::pair<std::string, std::string>("second", "world"));
+        std::vector<std::string> values;
+        values.emplace_back("first");
+        values.emplace_back("second");
+        values.emplace_back("third");
+        values.emplace_back("fourth");
+        TestStruct const test{
+            -57128,
+            42,
+            250.42f,
+            3.1415926535,
+            "hello world",
+            {0x15, 0x16, 42},
+            std::move(map),
+            TestEnum::First,
+            std::chrono::system_clock::now(),
+            {
+                        {"John", "Bjarne", "Rene"},
+                        std::move(values),
+                        {42, "The answer to everything"},
+                    }
+        };
+        std::vector<std::int8_t> data{};
+        auto inserter = std::back_insert_iterator(data);
+        msgpack23::pack(inserter, test);
+        auto const obj = msgpack23::unpack<std::int8_t, TestStruct>(data);
+
+        EXPECT_EQ(obj.int64, test.int64);
+        EXPECT_EQ(obj.uint32, test.uint32);
+        EXPECT_EQ(obj.float32, test.float32);
+        EXPECT_EQ(obj.double64, test.double64);
+        EXPECT_EQ(obj.string, test.string);
+        EXPECT_EQ(obj.data, test.data);
+        EXPECT_EQ(obj.map, test.map);
+        EXPECT_EQ(obj.testEnum, test.testEnum);
+        EXPECT_EQ(obj.time_point, test.time_point);
+        EXPECT_EQ(obj.nestedStruct.names, test.nestedStruct.names);
+        EXPECT_EQ(obj.nestedStruct.values, test.nestedStruct.values);
+        EXPECT_EQ(obj.nestedStruct.tuple, test.nestedStruct.tuple);
+    }
 }
