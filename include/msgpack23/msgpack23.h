@@ -518,7 +518,7 @@ namespace msgpack23 {
         }
 
         [[nodiscard]] bool check_constant(FormatConstants const &value) const {
-            return current() == static_cast<B>(std::to_underlying(value));
+            return static_cast<B>(current()) == static_cast<B>(std::to_underlying(value));
         }
 
         [[nodiscard]] FormatConstants current_constant() const {
