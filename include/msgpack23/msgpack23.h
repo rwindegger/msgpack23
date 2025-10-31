@@ -1029,7 +1029,7 @@ namespace msgpack23 {
 
     template<container Container, packable_object<Packer<typename Container::value_type, std::back_insert_iterator<Container>>> PackableObject>
     void pack(std::back_insert_iterator<Container> iterator, PackableObject const &obj) {
-        return pack(iterator, obj);
+        return pack<typename Container::value_type, std::back_insert_iterator<Container>, PackableObject>(iterator, obj);
     }
 
     template<byte_type B, unpackable_object<Unpacker<B>> UnpackableObject>
