@@ -81,7 +81,7 @@ namespace {
         std::vector<std::byte> data{};
         auto inserter = std::back_insert_iterator(data);
         msgpack23::pack(inserter, test);
-        auto obj = msgpack23::unpack<TestStruct>(data);
+        auto const obj = msgpack23::unpack<std::byte, TestStruct>(data);
 
         EXPECT_EQ(obj.int64, test.int64);
         EXPECT_EQ(obj.uint32, test.uint32);
@@ -117,6 +117,6 @@ namespace {
         std::vector<std::byte> data{};
         auto const inserter = std::back_insert_iterator(data);
         msgpack23::pack(inserter, my_data);
-        auto obj = msgpack23::unpack<MyData>(data);
+        auto obj = msgpack23::unpack<std::byte, MyData>(data);
     }
 }

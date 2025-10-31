@@ -503,9 +503,9 @@ namespace msgpack23 {
         std::span<B const> data_;
         std::size_t position_{0};
 
-        [[nodiscard]] B current() const {
+        [[nodiscard]] std::byte current() const {
             if (position_ < data_.size()) {
-                return data_[position_];
+                return std::byte{ data_[position_] };
             }
             throw std::out_of_range("Unpacker doesn't have enough data.");
         }
@@ -564,7 +564,7 @@ namespace msgpack23 {
             if (read_conditional<FormatConstants::map32, std::uint32_t>(map_size)
                 or read_conditional<FormatConstants::map16, std::uint16_t>(map_size)) {
             } else {
-                map_size = std::to_integer<std::size_t>(current() & static_cast<B>(0b00001111));
+                map_size = std::to_integer<std::size_t>(current() & static_cast<std::byte>(0b00001111));
                 increment();
             }
             return map_size;
@@ -575,7 +575,7 @@ namespace msgpack23 {
             if (read_conditional<FormatConstants::array32, std::uint32_t>(array_size)
                 or read_conditional<FormatConstants::array16, std::uint16_t>(array_size)) {
             } else {
-                array_size = std::to_integer<std::size_t>(current() & static_cast<B>(0b00001111));
+                array_size = std::to_integer<std::size_t>(current() & static_cast<std::byte>(0b00001111));
                 increment();
             }
             return array_size;
@@ -977,7 +977,7 @@ namespace msgpack23 {
                 or read_conditional<FormatConstants::str16, std::uint16_t>(str_size)
                 or read_conditional<FormatConstants::str8, std::uint8_t>(str_size)) {
             } else {
-                str_size = std::to_integer<std::size_t>(current() & static_cast<B>(0b00011111));
+                str_size = std::to_integer<std::size_t>(current() & static_cast<std::byte>(0b00011111));
                 increment();
             }
             if (position_ + str_size > data_.size()) {
@@ -1015,10 +1015,10 @@ namespace msgpack23 {
     template<container Container>
 	Unpacker(Container const&)->Unpacker<typename Container::value_type>;
 
-    template<typename T, typename B>
-    concept unpackable_object = requires(T t, Unpacker<B> u)
+    template<typename T, typename U>
+    concept unpackable_object = requires(T t, U u)
     {
-        { t.unpack(u) };
+        t.unpack(u);
     };
 
     template<byte_type B, std::output_iterator<B> Iter, packable_object<Packer<B, Iter> > PackableObject>

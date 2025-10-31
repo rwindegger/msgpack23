@@ -58,7 +58,7 @@ namespace {
         constexpr double expected{3.1415};
         packer(expected);
         std::nullptr_t actual;
-        msgpack23::Unpacker unpacker{};
+        msgpack23::Unpacker<std::byte> unpacker{};
         EXPECT_THROW(unpacker(actual), std::logic_error);
     }
 
@@ -69,7 +69,7 @@ namespace {
         constexpr double expected{3.1415};
         packer(expected);
         bool actual;
-        msgpack23::Unpacker unpacker{};
+        msgpack23::Unpacker<std::byte> unpacker{};
         EXPECT_THROW(unpacker(actual), std::logic_error);
     }
 
