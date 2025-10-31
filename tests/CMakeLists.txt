@@ -7,6 +7,7 @@ find_package(GTest REQUIRED)
 add_executable(
         msgpack23_tests
         array_tests.cpp
+        byte_type_tests.cpp
         chrono_tests.cpp
         exception_tests.cpp
         int8_tests.cpp

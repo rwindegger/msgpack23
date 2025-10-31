@@ -31,7 +31,7 @@ namespace {
         std::vector<std::byte> data{};
         auto const inserter = std::back_insert_iterator(data);
         msgpack23::pack(inserter, testIntStruct);
-        auto [actual] = msgpack23::unpack<Int32Struct>(data);
+        auto [actual] = msgpack23::unpack<std::byte, Int32Struct>(data);
         EXPECT_EQ(actual, GetParam());
     }
 
