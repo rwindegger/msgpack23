@@ -161,12 +161,12 @@ namespace msgpack23 {
     };
 
     template<typename T>
-    concept ByteType = std::same_as<T, std::byte> ||
+    concept byte_type = std::same_as<T, std::byte> ||
         std::same_as<T, char> ||
         std::same_as<T, unsigned char> ||
         std::same_as<T, std::uint8_t>;
 
-    template<ByteType B, std::output_iterator<B> Iter>
+    template<byte_type B, std::output_iterator<B> Iter>
     class Packer final {
     public:
         template<typename... Types>
@@ -259,7 +259,7 @@ namespace msgpack23 {
             std::size_t size = 0;
             std::visit([this, &size](auto const &arg) {
                 const auto inserter = counting_inserter<B>{size};
-                Packer<counting_inserter<B> > packer{inserter};
+                Packer<B, counting_inserter<B> > packer{inserter};
                 packer(arg);
             }, value);
 
@@ -480,12 +480,12 @@ namespace msgpack23 {
         Packer<typename Container::value_type, std::back_insert_iterator<Container>>;
 
     template<typename T, typename P>
-    concept PackableObject = requires(T t, P p)
+    concept packable_object = requires(T t, P p)
     {
         { t.pack(p) };
     };
 
-    template<ByteType B>
+    template<byte_type B>
     class Unpacker final {
     public:
         Unpacker() : data_() {
@@ -1007,24 +1007,33 @@ namespace msgpack23 {
     template<typename T>
     Unpacker(std::span<T const>) -> Unpacker<std::remove_const_t<T>>;
 
-    template<typename Container>
-    requires requires (Container c) { typename Container::value_type; } && ByteType<typename Container::value_type>
+    template<typename T>
+    concept container = requires (T b) {
+        typename T::value_type;
+    } && byte_type<typename T::value_type>;
+
+    template<container Container>
 	Unpacker(Container const&)->Unpacker<typename Container::value_type>;
 
-    template<typename T>
-    concept UnpackableObject = requires(T t, Unpacker u)
+    template<typename T, typename B>
+    concept unpackable_object = requires(T t, Unpacker<B> u)
     {
-        t.unpack(u);
+        { t.unpack(u) };
     };
 
-    template<ByteType B, std::output_iterator<B> Iter, PackableObject<Packer<Iter> > PackableObject>
+    template<byte_type B, std::output_iterator<B> Iter, packable_object<Packer<B, Iter> > PackableObject>
     void pack(Iter iterator, PackableObject const &obj) {
-        Packer<Iter> packer{iterator};
+        Packer<B, Iter> packer{iterator};
         return obj.pack(packer);
     }
 
-    template<ByteType B, UnpackableObject UnpackableObject>
-    [[nodiscard]] UnpackableObject unpack(std::span<const B> const data) {
+    template<container Container, packable_object<Packer<typename Container::value_type, std::back_insert_iterator<Container>>> PackableObject>
+    void pack(std::back_insert_iterator<Container> iterator, PackableObject const &obj) {
+        return pack(iterator, obj);
+    }
+
+    template<byte_type B, unpackable_object<Unpacker<B>> UnpackableObject>
+    [[nodiscard]] UnpackableObject unpack(std::span<B const> const data) {
         Unpacker unpacker(data);
         UnpackableObject obj{};
         obj.unpack(unpacker);
