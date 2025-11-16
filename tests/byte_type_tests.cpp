@@ -117,10 +117,10 @@ namespace {
             TestEnum::First,
             std::chrono::system_clock::now(),
             {
-                    {"John", "Bjarne", "Rene"},
-                    std::move(values),
-                    {42, "The answer to everything"},
-                }
+                {"John", "Bjarne", "Rene"},
+                std::move(values),
+                {42, "The answer to everything"},
+            }
         };
         std::vector<std::uint8_t> data{};
         auto inserter = std::back_insert_iterator(data);
@@ -161,10 +161,10 @@ namespace {
             TestEnum::First,
             std::chrono::system_clock::now(),
             {
-                    {"John", "Bjarne", "Rene"},
-                    std::move(values),
-                    {42, "The answer to everything"},
-                }
+                {"John", "Bjarne", "Rene"},
+                std::move(values),
+                {42, "The answer to everything"},
+            }
         };
         std::vector<char> data{};
         auto inserter = std::back_insert_iterator(data);
@@ -205,10 +205,10 @@ namespace {
             TestEnum::First,
             std::chrono::system_clock::now(),
             {
-                        {"John", "Bjarne", "Rene"},
-                        std::move(values),
-                        {42, "The answer to everything"},
-                    }
+                {"John", "Bjarne", "Rene"},
+                std::move(values),
+                {42, "The answer to everything"},
+            }
         };
         std::vector<std::int8_t> data{};
         auto inserter = std::back_insert_iterator(data);
