@@ -2,11 +2,8 @@
 // Created by Rene Windegger on 28/10/2025.
 //
 #include <iostream>
-#include <cstddef>
 #include <iterator>
-#include <utility>
 #include <vector>
-#include <map>
 #include <msgpack23/msgpack23.h>
 
 struct MyData {
@@ -30,7 +27,7 @@ int main() {
     std::vector<unsigned char> data{};
     msgpack23::pack(std::back_inserter(data), original);
 
-    const auto [my_integer, my_string] = msgpack23::unpack<unsigned char, MyData>(data);
+    const auto [my_integer, my_string] = msgpack23::unpack<MyData>(data);
 
     std::cout << my_integer << ' ' << my_string << '\n';
 }

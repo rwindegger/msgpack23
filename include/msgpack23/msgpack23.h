@@ -8,7 +8,6 @@
 #include <bitset>
 #include <chrono>
 #include <cstddef>
-#include <cstring>
 #include <iterator>
 #include <span>
 #include <string>
@@ -156,16 +155,17 @@ namespace msgpack23 {
         constexpr counting_inserter operator++(int) {
             return *this;
         }
+
     private:
         std::size_t *size_{};
     };
 
     template<typename T>
     concept byte_type = std::same_as<T, std::byte>
-    or std::same_as<T, char>
-    or std::same_as<T, unsigned char>
-    or std::same_as<T, std::uint8_t>
-    or std::same_as<T, std::int8_t>;
+                        or std::same_as<T, char>
+                        or std::same_as<T, unsigned char>
+                        or std::same_as<T, std::uint8_t>
+                        or std::same_as<T, std::int8_t>;
 
     template<byte_type B, std::output_iterator<B> Iter>
     class Packer final {
@@ -478,7 +478,7 @@ namespace msgpack23 {
 
     template<typename Container>
     Packer(std::back_insert_iterator<Container>) ->
-        Packer<typename Container::value_type, std::back_insert_iterator<Container>>;
+        Packer<typename Container::value_type, std::back_insert_iterator<Container> >;
 
     template<typename T, typename P>
     concept packable_object = requires(T t, P p)
@@ -526,7 +526,7 @@ namespace msgpack23 {
             return static_cast<FormatConstants>(std::to_integer<std::uint8_t>(current()));
         }
 
-        template<typename T, std::enable_if_t<std::is_unsigned_v<T>, int>  = 0>
+        template<typename T, std::enable_if_t<std::is_unsigned_v<T>, int> = 0>
         [[nodiscard]] T read_integral() {
             if (position_ + sizeof(T) > data_.size()) {
                 throw std::out_of_range("Unpacker doesn't have enough data.");
@@ -1006,7 +1006,7 @@ namespace msgpack23 {
     };
 
     template<typename T>
-    Unpacker(std::span<T const>) -> Unpacker<std::remove_const_t<T>>;
+    Unpacker(std::span<T const>) -> Unpacker<std::remove_const_t<T> >;
 
     template<typename T>
     concept container = requires (T b) {
@@ -1014,7 +1014,7 @@ namespace msgpack23 {
     } && byte_type<typename T::value_type>;
 
     template<container Container>
-	Unpacker(Container const&)->Unpacker<typename Container::value_type>;
+    Unpacker(Container const &) -> Unpacker<typename Container::value_type>;
 
     template<typename T, typename U>
     concept unpackable_object = requires(T t, U u)
@@ -1039,5 +1039,29 @@ namespace msgpack23 {
         UnpackableObject obj{};
         obj.unpack(unpacker);
         return obj;
+    }
+
+    template<typename T>
+    struct span_value_type;
+
+    template<typename T>
+        requires requires { typename std::ranges::range_value_t<T>; }
+    struct span_value_type<T> {
+        using type = std::ranges::range_value_t<T>;
+    };
+
+    template<typename T>
+    using span_value_type_t = typename span_value_type<T>::type;
+
+    template<typename T>
+    concept span_convertible = std::ranges::contiguous_range<T>
+        && std::ranges::sized_range<T>
+        && byte_type<std::remove_const_t<span_value_type_t<T>>>;
+
+    template<typename UnpackableObject, span_convertible Container>
+        requires unpackable_object<UnpackableObject, Unpacker<std::remove_const_t<span_value_type_t<Container>>>>
+    [[nodiscard]] UnpackableObject unpack(Container const& data) {
+        using B = std::remove_const_t<span_value_type_t<Container>>;
+        return unpack<B, UnpackableObject>(std::span<B const>{data});
     }
 }

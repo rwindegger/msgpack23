@@ -81,7 +81,7 @@ namespace {
         std::vector<unsigned char> data{};
         auto inserter = std::back_insert_iterator(data);
         msgpack23::pack(inserter, test);
-        auto const obj = msgpack23::unpack<unsigned char, TestStruct>(data);
+        auto const obj = msgpack23::unpack<TestStruct>(data);
 
         EXPECT_EQ(obj.int64, test.int64);
         EXPECT_EQ(obj.uint32, test.uint32);
@@ -125,7 +125,7 @@ namespace {
         std::vector<std::uint8_t> data{};
         auto inserter = std::back_insert_iterator(data);
         msgpack23::pack(inserter, test);
-        auto const obj = msgpack23::unpack<std::uint8_t, TestStruct>(data);
+        auto const obj = msgpack23::unpack<TestStruct>(data);
 
         EXPECT_EQ(obj.int64, test.int64);
         EXPECT_EQ(obj.uint32, test.uint32);
@@ -169,7 +169,7 @@ namespace {
         std::vector<char> data{};
         auto inserter = std::back_insert_iterator(data);
         msgpack23::pack(inserter, test);
-        auto const obj = msgpack23::unpack<char, TestStruct>(data);
+        auto const obj = msgpack23::unpack<TestStruct>(data);
 
         EXPECT_EQ(obj.int64, test.int64);
         EXPECT_EQ(obj.uint32, test.uint32);
@@ -213,7 +213,7 @@ namespace {
         std::vector<std::int8_t> data{};
         auto inserter = std::back_insert_iterator(data);
         msgpack23::pack(inserter, test);
-        auto const obj = msgpack23::unpack<std::int8_t, TestStruct>(data);
+        auto const obj = msgpack23::unpack<TestStruct>(data);
 
         EXPECT_EQ(obj.int64, test.int64);
         EXPECT_EQ(obj.uint32, test.uint32);

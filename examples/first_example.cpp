@@ -2,7 +2,6 @@
 // Created by Rene Windegger on 28/10/2025.
 //
 #include <iostream>
-#include <cstddef>
 #include <iterator>
 #include <utility>
 #include <vector>

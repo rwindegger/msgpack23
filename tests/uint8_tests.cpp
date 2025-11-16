@@ -30,7 +30,7 @@ namespace {
         std::vector<std::byte> data{};
         auto const inserter = std::back_insert_iterator(data);
         msgpack23::pack(inserter, testIntStruct);
-        auto [int8] = msgpack23::unpack<std::byte, UInt8Struct>(data);
+        auto [int8] = msgpack23::unpack<UInt8Struct>(data);
         EXPECT_EQ(int8, GetParam());
     }
 
