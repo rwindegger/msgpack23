@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstring>
 #include <iterator>
+#include <ranges>
 #include <span>
 #include <string>
 #include <type_traits>
@@ -478,6 +479,7 @@ namespace msgpack23 {
     };
 
     template<typename Container>
+        requires byte_type<typename Container::value_type>
     Packer(std::back_insert_iterator<Container>) ->
         Packer<typename Container::value_type, std::back_insert_iterator<Container> >;
 
