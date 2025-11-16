@@ -1036,7 +1036,8 @@ namespace msgpack23 {
         return pack<typename Container::value_type, std::back_insert_iterator<Container>, PackableObject>(iterator, obj);
     }
 
-    template<byte_type B, unpackable_object<Unpacker<B>> UnpackableObject>
+    template<typename UnpackableObject, byte_type B>
+        requires unpackable_object<UnpackableObject, Unpacker<B>>
     [[nodiscard]] UnpackableObject unpack(std::span<B const> const data) {
         Unpacker unpacker(data);
         UnpackableObject obj{};
@@ -1065,6 +1066,6 @@ namespace msgpack23 {
         requires unpackable_object<UnpackableObject, Unpacker<std::remove_const_t<span_value_type_t<Container>>>>
     [[nodiscard]] UnpackableObject unpack(Container const& data) {
         using B = std::remove_const_t<span_value_type_t<Container>>;
-        return unpack<B, UnpackableObject>(std::span<B const>{data});
+        return unpack<UnpackableObject>(std::span<B const>{data});
     }
 }
