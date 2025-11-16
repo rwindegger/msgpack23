@@ -8,6 +8,7 @@
 #include <bitset>
 #include <chrono>
 #include <cstddef>
+#include <cstring>
 #include <iterator>
 #include <span>
 #include <string>
