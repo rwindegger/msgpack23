@@ -1046,26 +1046,14 @@ namespace msgpack23 {
     }
 
     template<typename T>
-    struct span_value_type;
-
-    template<typename T>
-        requires requires { typename std::ranges::range_value_t<T>; }
-    struct span_value_type<T> {
-        using type = std::ranges::range_value_t<T>;
-    };
-
-    template<typename T>
-    using span_value_type_t = typename span_value_type<T>::type;
-
-    template<typename T>
     concept span_convertible = std::ranges::contiguous_range<T>
         && std::ranges::sized_range<T>
-        && byte_type<std::remove_const_t<span_value_type_t<T>>>;
+        && byte_type<std::remove_const_t<std::ranges::range_value_t<T>>>;
 
     template<typename UnpackableObject, span_convertible Container>
-        requires unpackable_object<UnpackableObject, Unpacker<std::remove_const_t<span_value_type_t<Container>>>>
+        requires unpackable_object<UnpackableObject, Unpacker<std::remove_const_t<std::ranges::range_value_t<Container>>>>
     [[nodiscard]] UnpackableObject unpack(Container const& data) {
-        using B = std::remove_const_t<span_value_type_t<Container>>;
+        using B = std::remove_const_t<std::ranges::range_value_t<Container>>;
         return unpack<UnpackableObject>(std::span<B const>{data});
     }
 }
