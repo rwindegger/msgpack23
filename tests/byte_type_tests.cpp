@@ -1,5 +1,5 @@
 //
-// Created by Rene Windegger on 14/02/2025.
+// Created by Rene Windegger on 31/10/2025.
 //
 
 #include <array>
@@ -53,7 +53,22 @@ namespace {
         }
     };
 
-    TEST(msgpack23, NestedObjectPacking) {
+    template<typename T>
+    class msgpack23_byte_type : public ::testing::Test {
+    public:
+        using ByteType = T;
+    };
+
+    using ByteTypes = ::testing::Types<
+        unsigned char,
+        std::uint8_t,
+        char,
+        std::byte,
+        std::int8_t
+    >;
+    TYPED_TEST_SUITE(msgpack23_byte_type, ByteTypes);
+
+    TYPED_TEST(msgpack23_byte_type, NestedObjectPacking) {
         std::map<std::string, std::string> map;
         map.insert(std::pair<std::string, std::string>("first", "hello"));
         map.insert(std::pair<std::string, std::string>("second", "world"));
@@ -78,7 +93,7 @@ namespace {
                 {42, "The answer to everything"},
             }
         };
-        std::vector<std::byte> data{};
+        std::vector<typename TestFixture::ByteType> data{};
         auto inserter = std::back_insert_iterator(data);
         msgpack23::pack(inserter, test);
         auto const obj = msgpack23::unpack<TestStruct>(data);
@@ -95,28 +110,5 @@ namespace {
         EXPECT_EQ(obj.nestedStruct.names, test.nestedStruct.names);
         EXPECT_EQ(obj.nestedStruct.values, test.nestedStruct.values);
         EXPECT_EQ(obj.nestedStruct.tuple, test.nestedStruct.tuple);
-    }
-
-    struct MyData {
-        std::int64_t my_integer;
-        std::string my_string;
-
-        template<typename T>
-        void pack(T &packer) const {
-            packer(my_integer, my_string);
-        }
-
-        template<typename T>
-        void unpack(T &unpacker) {
-            unpacker(my_integer, my_string);
-        }
-    };
-
-    TEST(msgpack23, SimpleObjectPacking) {
-        MyData const my_data{42, "Hello"};
-        std::vector<std::byte> data{};
-        auto const inserter = std::back_insert_iterator(data);
-        msgpack23::pack(inserter, my_data);
-        auto obj = msgpack23::unpack<MyData>(data);
     }
 }

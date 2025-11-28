@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstring>
 #include <iterator>
+#include <ranges>
 #include <span>
 #include <string>
 #include <type_traits>
@@ -156,11 +157,19 @@ namespace msgpack23 {
         constexpr counting_inserter operator++(int) {
             return *this;
         }
+
     private:
         std::size_t *size_{};
     };
 
-    template<std::output_iterator<std::byte> Iter>
+    template<typename T>
+    concept byte_type = std::same_as<T, std::byte>
+                        or std::same_as<T, char>
+                        or std::same_as<T, unsigned char>
+                        or std::same_as<T, std::uint8_t>
+                        or std::same_as<T, std::int8_t>;
+
+    template<byte_type B, std::output_iterator<B> Iter>
     class Packer final {
     public:
         template<typename... Types>
@@ -175,13 +184,13 @@ namespace msgpack23 {
         Iter store_;
 
         void emplace_constant(FormatConstants const &value) {
-            *store_++ = static_cast<std::byte>(std::to_underlying(value));
+            *store_++ = static_cast<B>(std::to_underlying(value));
         }
 
         template<std::integral T>
         void emplace_integral(T const &value) {
             auto const serialize_value = to_big_endian(value);
-            auto const bytes = std::bit_cast<std::array<std::byte, sizeof(serialize_value)> >(serialize_value);
+            auto const bytes = std::bit_cast<std::array<B, sizeof(serialize_value)> >(serialize_value);
             std::copy(bytes.begin(), bytes.end(), store_);
         }
 
@@ -193,8 +202,8 @@ namespace msgpack23 {
 
         [[nodiscard]] bool pack_map_header(std::size_t const n) {
             if (n < 16) {
-                constexpr auto size_mask = static_cast<std::byte>(0b10000000);
-                *store_++ = static_cast<std::byte>(n) | size_mask;
+                constexpr auto size_mask = static_cast<B>(0b10000000);
+                *store_++ = static_cast<B>(n) | size_mask;
             } else if (n < std::numeric_limits<std::uint16_t>::max()) {
                 emplace_combined(FormatConstants::map16, static_cast<std::uint16_t>(n));
             } else if (n < std::numeric_limits<std::uint32_t>::max()) {
@@ -207,8 +216,8 @@ namespace msgpack23 {
 
         [[nodiscard]] bool pack_array_header(std::size_t const n) {
             if (n < 16) {
-                constexpr auto size_mask = static_cast<std::byte>(0b10010000);
-                *store_++ = static_cast<std::byte>(n) | size_mask;
+                constexpr auto size_mask = static_cast<B>(0b10010000);
+                *store_++ = static_cast<B>(n) | size_mask;
             } else if (n < std::numeric_limits<std::uint16_t>::max()) {
                 emplace_combined(FormatConstants::array16, static_cast<std::uint16_t>(n));
             } else if (n < std::numeric_limits<std::uint32_t>::max()) {
@@ -252,8 +261,8 @@ namespace msgpack23 {
         void pack_type(T const &value) {
             std::size_t size = 0;
             std::visit([this, &size](auto const &arg) {
-                const auto inserter = counting_inserter<std::byte>{size};
-                Packer<counting_inserter<std::byte> > packer{inserter};
+                const auto inserter = counting_inserter<B>{size};
+                Packer<B, counting_inserter<B> > packer{inserter};
                 packer(arg);
             }, value);
 
@@ -345,7 +354,7 @@ namespace msgpack23 {
             if (value > 31 or value < -32) {
                 emplace_constant(FormatConstants::int8);
             }
-            *store_++ = static_cast<std::byte>(value);
+            *store_++ = static_cast<B>(value);
         }
 
         void pack_type(std::int16_t const &value) {
@@ -383,10 +392,10 @@ namespace msgpack23 {
 
         void pack_type(std::uint8_t const &value) {
             if (value < 0x80) {
-                *store_++ = static_cast<std::byte>(value);
+                *store_++ = static_cast<B>(value);
             } else {
                 emplace_constant(FormatConstants::uint8);
-                *store_++ = static_cast<std::byte>(value);
+                *store_++ = static_cast<B>(value);
             }
         }
 
@@ -437,10 +446,10 @@ namespace msgpack23 {
 
         void pack_type(std::string const &value) {
             if (value.size() < 32) {
-                *store_++ = static_cast<std::byte>(value.size()) | static_cast<std::byte>(0b10100000);
+                *store_++ = static_cast<B>(value.size()) | static_cast<B>(0b10100000);
             } else if (value.size() < std::numeric_limits<std::uint8_t>::max()) {
                 emplace_constant(FormatConstants::str8);
-                *store_++ = static_cast<std::byte>(value.size());
+                *store_++ = static_cast<B>(value.size());
             } else if (value.size() < std::numeric_limits<std::uint16_t>::max()) {
                 emplace_combined(FormatConstants::str16, static_cast<std::uint16_t>(value.size()));
             } else if (value.size() < std::numeric_limits<std::uint32_t>::max()) {
@@ -449,14 +458,14 @@ namespace msgpack23 {
                 throw std::length_error("String is too long to be serialized.");
             }
 
-            std::copy(reinterpret_cast<std::byte const * const>(value.data()),
-                      reinterpret_cast<std::byte const * const>(value.data() + value.size()), store_);
+            std::copy(reinterpret_cast<B const * const>(value.data()),
+                      reinterpret_cast<B const * const>(value.data() + value.size()), store_);
         }
 
-        void pack_type(std::vector<std::byte> const &value) {
+        void pack_type(std::vector<B> const &value) {
             if (value.size() < std::numeric_limits<std::uint8_t>::max()) {
                 emplace_constant(FormatConstants::bin8);
-                *store_++ = static_cast<std::byte>(value.size());
+                *store_++ = static_cast<B>(value.size());
             } else if (value.size() < std::numeric_limits<std::uint16_t>::max()) {
                 emplace_combined(FormatConstants::bin16, static_cast<std::uint16_t>(value.size()));
             } else if (value.size() < std::numeric_limits<std::uint32_t>::max()) {
@@ -464,23 +473,29 @@ namespace msgpack23 {
             } else {
                 throw std::length_error("Vector is too long to be serialized.");
             }
-            std::copy(reinterpret_cast<std::byte const * const>(value.data()),
-                      reinterpret_cast<std::byte const * const>(value.data() + value.size()), store_);
+            std::copy(reinterpret_cast<B const * const>(value.data()),
+                      reinterpret_cast<B const * const>(value.data() + value.size()), store_);
         }
     };
 
+    template<typename Container>
+        requires byte_type<typename Container::value_type>
+    Packer(std::back_insert_iterator<Container>) ->
+        Packer<typename Container::value_type, std::back_insert_iterator<Container> >;
+
     template<typename T, typename P>
-    concept PackableObject = requires(T t, P p)
+    concept packable_object = requires(T t, P p)
     {
         { t.pack(p) };
     };
 
+    template<byte_type B>
     class Unpacker final {
     public:
         Unpacker() : data_() {
         }
 
-        explicit Unpacker(std::span<std::byte const> const data) : data_(data) {
+        explicit Unpacker(std::span<B const> const data) : data_(data) {
         }
 
         template<typename... Types>
@@ -489,12 +504,12 @@ namespace msgpack23 {
         }
 
     private:
-        std::span<std::byte const> data_;
+        std::span<B const> data_;
         std::size_t position_{0};
 
         [[nodiscard]] std::byte current() const {
             if (position_ < data_.size()) {
-                return data_[position_];
+                return static_cast<std::byte>(data_[position_]);
             }
             throw std::out_of_range("Unpacker doesn't have enough data.");
         }
@@ -514,7 +529,7 @@ namespace msgpack23 {
             return static_cast<FormatConstants>(std::to_integer<std::uint8_t>(current()));
         }
 
-        template<typename T, std::enable_if_t<std::is_unsigned_v<T>, int>  = 0>
+        template<typename T, std::enable_if_t<std::is_unsigned_v<T>, int> = 0>
         [[nodiscard]] T read_integral() {
             if (position_ + sizeof(T) > data_.size()) {
                 throw std::out_of_range("Unpacker doesn't have enough data.");
@@ -976,7 +991,7 @@ namespace msgpack23 {
             increment(str_size);
         }
 
-        void unpack_type(std::vector<std::byte> &value) {
+        void unpack_type(std::vector<B> &value) {
             std::size_t bin_size = 0;
             if (read_conditional<FormatConstants::bin32, std::uint32_t>(bin_size)
                 or read_conditional<FormatConstants::bin16, std::uint16_t>(bin_size)
@@ -987,29 +1002,58 @@ namespace msgpack23 {
             if (position_ + bin_size > data_.size()) {
                 throw std::out_of_range("Vector position is out of range");
             }
-            auto const *src = reinterpret_cast<std::byte const *>(data_.data() + position_);
+            auto const *src = data_.data() + position_;
             value.assign(src, src + bin_size);
             increment(bin_size);
         }
     };
 
     template<typename T>
-    concept UnpackableObject = requires(T t, Unpacker u)
+    Unpacker(std::span<T const>) -> Unpacker<std::remove_const_t<T> >;
+
+    template<typename T>
+    concept container = requires (T b) {
+        typename T::value_type;
+    } && byte_type<typename T::value_type>;
+
+    template<container Container>
+    Unpacker(Container const &) -> Unpacker<typename Container::value_type>;
+
+    template<typename T, typename U>
+    concept unpackable_object = requires(T t, U u)
     {
         t.unpack(u);
     };
 
-    template<std::output_iterator<std::byte> Iter, PackableObject<Packer<Iter> > PackableObject>
+    template<byte_type B, std::output_iterator<B> Iter, packable_object<Packer<B, Iter> > PackableObject>
     void pack(Iter iterator, PackableObject const &obj) {
-        Packer<Iter> packer{iterator};
+        Packer<B, Iter> packer{iterator};
         return obj.pack(packer);
     }
 
-    template<UnpackableObject UnpackableObject>
-    [[nodiscard]] UnpackableObject unpack(std::span<const std::byte> const data) {
+    template<container Container, packable_object<Packer<typename Container::value_type, std::back_insert_iterator<Container>>> PackableObject>
+    void pack(std::back_insert_iterator<Container> iterator, PackableObject const &obj) {
+        return pack<typename Container::value_type, std::back_insert_iterator<Container>, PackableObject>(iterator, obj);
+    }
+
+    template<typename UnpackableObject, byte_type B>
+        requires unpackable_object<UnpackableObject, Unpacker<B>>
+    [[nodiscard]] UnpackableObject unpack(std::span<B const> const data) {
         Unpacker unpacker(data);
         UnpackableObject obj{};
         obj.unpack(unpacker);
         return obj;
+    }
+
+    template<typename T>
+    concept span_convertible = std::ranges::contiguous_range<T>
+        && std::ranges::sized_range<T>
+        && byte_type<std::remove_const_t<std::ranges::range_value_t<T>>>;
+
+    template<typename UnpackableObject, span_convertible Container>
+        requires unpackable_object<UnpackableObject, Unpacker<std::remove_const_t<std::ranges::range_value_t<Container>>>>
+    [[nodiscard]] UnpackableObject unpack(Container const& data) {
+        using B = std::remove_const_t<std::ranges::range_value_t<Container>>;
+        return unpack<UnpackableObject>(std::span<B const>{data});
     }
 }
