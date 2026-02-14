@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.28)
 
-include(GoogleTest)
+CPMAddPackage("gh:google/googletest#v1.17.0")
 
-find_package(GTest REQUIRED)
+include(GoogleTest)
 
 add_executable(
         msgpack23_tests
