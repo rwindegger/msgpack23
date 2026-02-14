@@ -16,8 +16,7 @@ coverage:
       # not discovered via linked debug info (PDB). If they are never executed, they
       # will appear as 0% coverage (LCOV-like behavior).
       include:
-        - "src/**/*.cpp"
-        - "src/**/*.h"
+        - "include/**/*.h"
 
       # Exclude specific files or directories from the report.
       # Exclude rules always take precedence over include rules.
