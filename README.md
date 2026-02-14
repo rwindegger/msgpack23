@@ -1,6 +1,6 @@
 # msgpack23
 [![codecov](https://codecov.io/gh/rwindegger/msgpack23/graph/badge.svg?token=9JINA61YG2)](https://codecov.io/gh/rwindegger/msgpack23)
-[![covdbg](https://covdbg.com/badge.png)](https://covdbg.com/)
+[![covdbg](https://covdbg.com/badge.svg/)](https://covdbg.com/)
 
 A modern, header-only C++ library for MessagePack serialization and deserialization.
 
