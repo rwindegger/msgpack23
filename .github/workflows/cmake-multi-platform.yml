@@ -24,7 +24,7 @@ jobs:
       # To add more build types (Release, Debug, RelWithDebInfo, etc.) customize the build_type list.
       matrix:
         os: [ ubuntu-latest, windows-latest ]
-        build_type: [ Release ]
+        build_type: [ Release, Debug ]
         c_compiler: [ gcc, clang, cl ]
         include:
           - os: windows-latest
@@ -54,16 +54,11 @@ jobs:
         run: |
           echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
 
-      - name: Install Conan
-        id: conan
-        uses: turtlebrowser/get-conan@main
-
       - name: Configure CMake
         # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
         # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
         run: >
                cmake -B ${{ steps.strings.outputs.build-output-dir }}
-               -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES="conan_provider.cmake"
                -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
                -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
                -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
@@ -78,3 +73,22 @@ jobs:
         # Execute tests defined by the CMake configuration. Note that --build-config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
         # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
         run: ctest --build-config ${{ matrix.build_type }}
+
+      - name: Setup covdbg
+        if: matrix.os == 'windows-latest' && matrix.build_type == 'Debug'
+        uses: covdbg/setup-covdbg@v0
+        with:
+          version: 'latest'
+
+      - name: Run Coverage
+        if: matrix.os == 'windows-latest' && matrix.build_type == 'Debug'
+        shell: pwsh
+        run: |
+          covdbg --fetch-license --config .covdbg.yaml --output ${{ steps.strings.outputs.build-output-dir }}\tests\${{ matrix.build_type }}\msgpack23_tests.covdb ${{ steps.strings.outputs.build-output-dir }}\tests\${{ matrix.build_type }}\msgpack23_tests.exe
+          covdbg convert --format LCOV --input ${{ steps.strings.outputs.build-output-dir }}\tests\${{ matrix.build_type }}\msgpack23_tests.covdb --output ${{ steps.strings.outputs.build-output-dir }}\tests\${{ matrix.build_type }}\msgpack23_tests.lcov
+
+      - name: Upload coverage reports to Codecov
+        if: matrix.os == 'windows-latest' && matrix.build_type == 'Debug'
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
