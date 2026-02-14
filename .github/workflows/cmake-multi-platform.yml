@@ -24,7 +24,7 @@ jobs:
       # To add more build types (Release, Debug, RelWithDebInfo, etc.) customize the build_type list.
       matrix:
         os: [ ubuntu-latest, windows-latest ]
-        build_type: [ Release ]
+        build_type: [ Release, Debug ]
         c_compiler: [ gcc, clang, cl ]
         include:
           - os: windows-latest
@@ -75,19 +75,20 @@ jobs:
         run: ctest --build-config ${{ matrix.build_type }}
 
       - name: Setup covdbg
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-latest' && matrix.build_type == 'Debug'
         uses: covdbg/setup-covdbg@v0
         with:
           version: 'latest'
 
       - name: Run Coverage
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-latest' && matrix.build_type == 'Debug'
         shell: pwsh
         run: |
-          covdbg --fetch-license --config .covdbg.yaml --output ${{ steps.strings.outputs.build-output-dir }}\tests\msgpack23_tests.covdb ${{ steps.strings.outputs.build-output-dir }}\Debug\msgpack23_tests.exe
-          covdbg convert --format LCOV --input ${{ steps.strings.outputs.build-output-dir }}\tests\msgpack23_tests.covdb --output ${{ steps.strings.outputs.build-output-dir }}\Debug\msgpack23_tests.lcov
+          covdbg --fetch-license --config .covdbg.yaml --output ${{ steps.strings.outputs.build-output-dir }}\tests\${{ matrix.build_type }}\msgpack23_tests.covdb ${{ steps.strings.outputs.build-output-dir }}\tests\${{ matrix.build_type }}\msgpack23_tests.exe
+          covdbg convert --format LCOV --input ${{ steps.strings.outputs.build-output-dir }}\tests\${{ matrix.build_type }}\msgpack23_tests.covdb --output ${{ steps.strings.outputs.build-output-dir }}\tests\${{ matrix.build_type }}\msgpack23_tests.lcov
 
       - name: Upload coverage reports to Codecov
+        if: matrix.os == 'windows-latest' && matrix.build_type == 'Debug'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
