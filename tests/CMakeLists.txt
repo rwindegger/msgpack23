@@ -7,6 +7,7 @@ include(GoogleTest)
 add_executable(
         msgpack23_tests
         array_tests.cpp
+        bulk_write_tests.cpp
         byte_type_tests.cpp
         chrono_tests.cpp
         exception_tests.cpp
