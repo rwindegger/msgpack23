@@ -17,6 +17,7 @@ add_executable(
         main.cpp
         map_tests.cpp
         object_packing_tests.cpp
+        span_tests.cpp
         string_tests.cpp
         type_packing_tests.cpp
         uint8_tests.cpp

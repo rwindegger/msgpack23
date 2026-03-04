@@ -1006,6 +1006,24 @@ namespace msgpack23 {
             value.assign(src, src + bin_size);
             increment(bin_size);
         }
+
+        // Zero-copy alternative to the vector overload: returns a view into the
+        // internal buffer instead of copying. Valid only for the Unpacker's lifetime.
+        template<std::size_t E>
+        void unpack_type(std::span<B const, E> &value) {
+            std::size_t bin_size = 0;
+            if (read_conditional<FormatConstants::bin32, std::uint32_t>(bin_size)
+                or read_conditional<FormatConstants::bin16, std::uint16_t>(bin_size)
+                or read_conditional<FormatConstants::bin8, std::uint8_t>(bin_size)) {
+            } else {
+                throw std::logic_error("Unexpected value");
+            }
+            if (position_ + bin_size > data_.size()) {
+                throw std::out_of_range("Span position is out of range");
+            }
+            value = data_.subspan(position_, bin_size);
+            increment(bin_size);
+        }
     };
 
     template<typename T>
