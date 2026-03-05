@@ -476,6 +476,22 @@ namespace msgpack23 {
             std::copy(reinterpret_cast<B const * const>(value.data()),
                       reinterpret_cast<B const * const>(value.data() + value.size()), store_);
         }
+
+        template<std::size_t E>
+        void pack_type(std::span<B const, E> const &value) {
+            if (value.size() < std::numeric_limits<std::uint8_t>::max()) {
+                emplace_constant(FormatConstants::bin8);
+                *store_++ = static_cast<B>(value.size());
+            } else if (value.size() < std::numeric_limits<std::uint16_t>::max()) {
+                emplace_combined(FormatConstants::bin16, static_cast<std::uint16_t>(value.size()));
+            } else if (value.size() < std::numeric_limits<std::uint32_t>::max()) {
+                emplace_combined(FormatConstants::bin32, static_cast<std::uint32_t>(value.size()));
+            } else {
+                throw std::length_error("Span is too long to be serialized.");
+            }
+            auto const *src = reinterpret_cast<B const *>(value.data());
+            std::copy(src, src + value.size(), store_);
+        }
     };
 
     template<typename Container>
