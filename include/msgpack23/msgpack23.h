@@ -458,8 +458,12 @@ namespace msgpack23 {
                 throw std::length_error("String is too long to be serialized.");
             }
 
-            std::copy(reinterpret_cast<B const * const>(value.data()),
-                      reinterpret_cast<B const * const>(value.data() + value.size()), store_);
+            auto const *src = reinterpret_cast<B const *>(value.data());
+            if constexpr (requires { store_.write(src, value.size()); }) {
+                store_.write(src, value.size());
+            } else {
+                std::copy(src, src + value.size(), store_);
+            }
         }
 
         void pack_type(std::vector<B> const &value) {
@@ -473,8 +477,12 @@ namespace msgpack23 {
             } else {
                 throw std::length_error("Vector is too long to be serialized.");
             }
-            std::copy(reinterpret_cast<B const * const>(value.data()),
-                      reinterpret_cast<B const * const>(value.data() + value.size()), store_);
+            auto const *src = reinterpret_cast<B const *>(value.data());
+            if constexpr (requires { store_.write(src, value.size()); }) {
+                store_.write(src, value.size());
+            } else {
+                std::copy(src, src + value.size(), store_);
+            }
         }
 
         template<std::size_t E>
@@ -490,7 +498,11 @@ namespace msgpack23 {
                 throw std::length_error("Span is too long to be serialized.");
             }
             auto const *src = reinterpret_cast<B const *>(value.data());
-            std::copy(src, src + value.size(), store_);
+            if constexpr (requires { store_.write(src, value.size()); }) {
+                store_.write(src, value.size());
+            } else {
+                std::copy(src, src + value.size(), store_);
+            }
         }
     };
 
@@ -498,6 +510,12 @@ namespace msgpack23 {
         requires byte_type<typename Container::value_type>
     Packer(std::back_insert_iterator<Container>) ->
         Packer<typename Container::value_type, std::back_insert_iterator<Container> >;
+
+    template<typename Iter>
+        requires requires { typename Iter::value_type; }
+              && byte_type<typename Iter::value_type>
+              && std::output_iterator<Iter, typename Iter::value_type>
+    Packer(Iter) -> Packer<typename Iter::value_type, Iter>;
 
     template<typename T, typename P>
     concept packable_object = requires(T t, P p)
