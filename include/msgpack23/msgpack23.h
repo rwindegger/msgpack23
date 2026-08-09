@@ -297,8 +297,26 @@ namespace msgpack23 {
             }, value);
         }
 
+        template<std::integral T>
+            requires (!std::same_as<T, bool>)
+            and (!std::same_as<T, std::int8_t>)
+            and (!std::same_as<T, std::int16_t>)
+            and (!std::same_as<T, std::int32_t>)
+            and (!std::same_as<T, std::int64_t>)
+            and (!std::same_as<T, std::uint8_t>)
+            and (!std::same_as<T, std::uint16_t>)
+            and (!std::same_as<T, std::uint32_t>)
+            and (!std::same_as<T, std::uint64_t>)
+        void pack_type(T const &value) {
+            if constexpr (std::signed_integral<T>) {
+                pack_type(static_cast<std::int64_t>(value));
+            } else {
+                pack_type(static_cast<std::uint64_t>(value));
+            }
+        }
+
         template<typename T>
-            requires (!CollectionLike<T>) and (!MapLike<T>) and (!EnumLike<T>) and (!VariantLike<T>)
+            requires (!std::integral<T>) and (!CollectionLike<T>) and (!MapLike<T>) and (!EnumLike<T>) and (!VariantLike<T>)
         void pack_type(T const &value) {
             value.pack(*this);
         }
@@ -718,10 +736,32 @@ namespace msgpack23 {
         }
 
         template<typename T>
-            requires (!CollectionLike<T>) and (!MapLike<T>) and (!EnumLike<T>) and (!VariantLike<T>)
+            requires (!std::integral<T>) and (!CollectionLike<T>) and (!MapLike<T>) and (!EnumLike<T>) and (!VariantLike<T>)
         void unpack_type(T &value) {
             value.unpack(*this);
         }
+
+        template<std::integral T>
+            requires (!std::same_as<T, bool>)
+            and (!std::same_as<T, std::int8_t>)
+            and (!std::same_as<T, std::int16_t>)
+            and (!std::same_as<T, std::int32_t>)
+            and (!std::same_as<T, std::int64_t>)
+            and (!std::same_as<T, std::uint8_t>)
+            and (!std::same_as<T, std::uint16_t>)
+            and (!std::same_as<T, std::uint32_t>)
+            and (!std::same_as<T, std::uint64_t>)
+        void unpack_type(T &value) {
+            if constexpr (std::signed_integral<T>) {
+                std::int64_t tmp{};
+                unpack_type(tmp);
+                value = static_cast<T>(tmp);
+            } else {
+                std::uint64_t tmp{};
+                unpack_type(tmp);
+                value = static_cast<T>(tmp);
+            }
+            }
 
         template<typename Clock, typename Duration>
         void unpack_type(std::chrono::time_point<Clock, Duration> &value) {
