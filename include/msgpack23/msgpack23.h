@@ -297,8 +297,26 @@ namespace msgpack23 {
             }, value);
         }
 
+        template<std::integral T>
+            requires (!std::same_as<T, bool>)
+            and (!std::same_as<T, std::int8_t>)
+            and (!std::same_as<T, std::int16_t>)
+            and (!std::same_as<T, std::int32_t>)
+            and (!std::same_as<T, std::int64_t>)
+            and (!std::same_as<T, std::uint8_t>)
+            and (!std::same_as<T, std::uint16_t>)
+            and (!std::same_as<T, std::uint32_t>)
+            and (!std::same_as<T, std::uint64_t>)
+        void pack_type(T const &value) {
+            if constexpr (std::signed_integral<T>) {
+                pack_type(static_cast<std::int64_t>(value));
+            } else {
+                pack_type(static_cast<std::uint64_t>(value));
+            }
+        }
+
         template<typename T>
-            requires (!CollectionLike<T>) and (!MapLike<T>) and (!EnumLike<T>) and (!VariantLike<T>)
+            requires (!std::integral<T>) and (!CollectionLike<T>) and (!MapLike<T>) and (!EnumLike<T>) and (!VariantLike<T>)
         void pack_type(T const &value) {
             value.pack(*this);
         }
@@ -718,9 +736,141 @@ namespace msgpack23 {
         }
 
         template<typename T>
-            requires (!CollectionLike<T>) and (!MapLike<T>) and (!EnumLike<T>) and (!VariantLike<T>)
+            requires (!std::integral<T>) and (!CollectionLike<T>) and (!MapLike<T>) and (!EnumLike<T>) and (!VariantLike<T>)
         void unpack_type(T &value) {
             value.unpack(*this);
+        }
+
+        template<std::integral T>
+            requires (!std::same_as<T, bool>)
+            and (!std::same_as<T, std::int8_t>)
+            and (!std::same_as<T, std::int16_t>)
+            and (!std::same_as<T, std::int32_t>)
+            and (!std::same_as<T, std::int64_t>)
+            and (!std::same_as<T, std::uint8_t>)
+            and (!std::same_as<T, std::uint16_t>)
+            and (!std::same_as<T, std::uint32_t>)
+            and (!std::same_as<T, std::uint64_t>)
+        void unpack_type(T &value) {
+            auto const b = std::to_integer<std::uint8_t>(current());
+
+            if constexpr (std::signed_integral<T>) {
+                std::int64_t tmp{};
+                switch (current_constant()) {
+                    case FormatConstants::int64:
+                        increment();
+                        tmp = static_cast<std::int64_t>(read_integral<std::uint64_t>());
+                        break;
+                    case FormatConstants::int32:
+                        increment();
+                        tmp = static_cast<std::int32_t>(read_integral<std::uint32_t>());
+                        break;
+                    case FormatConstants::int16:
+                        increment();
+                        tmp = static_cast<std::int16_t>(read_integral<std::uint16_t>());
+                        break;
+                    case FormatConstants::int8:
+                        increment();
+                        tmp = static_cast<std::int8_t>(read_integral<std::uint8_t>());
+                        break;
+                    case FormatConstants::uint64: {
+                        increment();
+                        auto const u = read_integral<std::uint64_t>();
+                        if (u > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())) {
+                            throw std::out_of_range("Integer out of range");
+                        }
+                        tmp = static_cast<std::int64_t>(u);
+                        break;
+                    }
+                    case FormatConstants::uint32:
+                        increment();
+                        tmp = read_integral<std::uint32_t>();
+                        break;
+                    case FormatConstants::uint16:
+                        increment();
+                        tmp = read_integral<std::uint16_t>();
+                        break;
+                    case FormatConstants::uint8:
+                        increment();
+                        tmp = read_integral<std::uint8_t>();
+                        break;
+                    default:
+                        if (b <= 0x7f) {
+                            tmp = b;
+                            increment();
+                        } else if (b >= 0xe0) {
+                            tmp = static_cast<std::int8_t>(b);
+                            increment();
+                        } else {
+                            throw std::logic_error("Unexpected value");
+                        }
+                }
+                value = static_cast<T>(tmp);
+            } else {
+                std::uint64_t tmp{};
+                switch (current_constant()) {
+                    case FormatConstants::uint64:
+                        increment();
+                        tmp = read_integral<std::uint64_t>();
+                        break;
+                    case FormatConstants::uint32:
+                        increment();
+                        tmp = read_integral<std::uint32_t>();
+                        break;
+                    case FormatConstants::uint16:
+                        increment();
+                        tmp = read_integral<std::uint16_t>();
+                        break;
+                    case FormatConstants::uint8:
+                        increment();
+                        tmp = read_integral<std::uint8_t>();
+                        break;
+                    case FormatConstants::int64: {
+                        increment();
+                        auto const s = static_cast<std::int64_t>(read_integral<std::uint64_t>());
+                        if (s < 0) {
+                            throw std::out_of_range("Negative integer");
+                        }
+                        tmp = static_cast<std::uint64_t>(s);
+                        break;
+                    }
+                    case FormatConstants::int32: {
+                        increment();
+                        auto const s = static_cast<std::int32_t>(read_integral<std::uint32_t>());
+                        if (s < 0) {
+                            throw std::out_of_range("Negative integer");
+                        }
+                        tmp = static_cast<std::uint64_t>(s);
+                        break;
+                    }
+                    case FormatConstants::int16: {
+                        increment();
+                        auto const s = static_cast<std::int16_t>(read_integral<std::uint16_t>());
+                        if (s < 0) {
+                            throw std::out_of_range("Negative integer");
+                        }
+                        tmp = static_cast<std::uint64_t>(s);
+                        break;
+                    }
+                    case FormatConstants::int8: {
+                        increment();
+                        auto const s = static_cast<std::int8_t>(read_integral<std::uint8_t>());
+                        if (s < 0) {
+                            throw std::out_of_range("Negative integer");
+                        }
+                        tmp = static_cast<std::uint64_t>(s);
+                        break;
+                    }
+                    default:
+                        if (b <= 0x7f) {
+                            tmp = b;
+                            increment();
+                        } else {
+                            throw std::logic_error("Unexpected value");
+                        }
+                }
+                value = static_cast<T>(tmp);
+            }
         }
 
         template<typename Clock, typename Duration>

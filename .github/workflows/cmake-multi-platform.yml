@@ -18,14 +18,24 @@ jobs:
       # Set fail-fast to false to ensure that feedback is delivered for all matrix combinations. Consider changing this to true when your workflow is stable.
       fail-fast: false
 
-      # Set up a matrix to run the following 3 configurations:
-      # 1. <Windows, Release, latest MSVC compiler toolchain on the default runner image, default generator>
-      # 2. <Linux, Release, latest GCC compiler toolchain on the default runner image, default generator>
-      # 3. <Linux, Release, latest Clang compiler toolchain on the default runner image, default generator>
+      # Set up a matrix to run the following 6 configurations:
+      # 1. <Windows x64, latest MSVC compiler toolchain on the default runner image, default generator>
+      # 2. <Linux x64, latest GCC compiler toolchain on the default runner image, default generator>
+      # 3. <Linux x64, latest Clang compiler toolchain on the default runner image, default generator>
+      # 4. <Linux arm64, latest GCC compiler toolchain on the default runner image, default generator>
+      # 5. <Linux arm64, latest Clang compiler toolchain on the default runner image, default generator>
+      # 6. <macOS arm64, AppleClang compiler toolchain on the default runner image, default generator>
       #
+      # macOS builds with AppleClang only. Homebrew GCC cannot compile against the macOS 26 SDK, whose
+      # <mach/message.h> uses xnu_static_assert_struct_size() macros that GCC fails to parse. Every
+      # Homebrew GCC (12, 14, 15) is affected and the runner image ships no older SDK to fall back on,
+      # so macos-latest + gcc is excluded rather than worked around. Linux arm64 covers GCC/libstdc++
+      # on a non-x86_64 target instead.
+      #
+      # Every configuration is built once per entry in the build_type list.
       # To add more build types (Release, Debug, RelWithDebInfo, etc.) customize the build_type list.
       matrix:
-        os: [ ubuntu-latest, windows-latest ]
+        os: [ ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest ]
         build_type: [ Release, Debug ]
         c_compiler: [ gcc, clang, cl ]
         include:
@@ -38,12 +48,27 @@ jobs:
           - os: ubuntu-latest
             c_compiler: clang
             cpp_compiler: clang++
+          - os: ubuntu-24.04-arm
+            c_compiler: gcc
+            cpp_compiler: g++
+          - os: ubuntu-24.04-arm
+            c_compiler: clang
+            cpp_compiler: clang++
+          - os: macos-latest
+            c_compiler: clang
+            cpp_compiler: clang++
         exclude:
           - os: windows-latest
             c_compiler: gcc
           - os: windows-latest
             c_compiler: clang
           - os: ubuntu-latest
+            c_compiler: cl
+          - os: ubuntu-24.04-arm
+            c_compiler: cl
+          - os: macos-latest
+            c_compiler: gcc
+          - os: macos-latest
             c_compiler: cl
 
     steps:
