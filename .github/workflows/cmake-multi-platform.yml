@@ -18,14 +18,17 @@ jobs:
       # Set fail-fast to false to ensure that feedback is delivered for all matrix combinations. Consider changing this to true when your workflow is stable.
       fail-fast: false
 
-      # Set up a matrix to run the following 3 configurations:
-      # 1. <Windows, Release, latest MSVC compiler toolchain on the default runner image, default generator>
-      # 2. <Linux, Release, latest GCC compiler toolchain on the default runner image, default generator>
-      # 3. <Linux, Release, latest Clang compiler toolchain on the default runner image, default generator>
+      # Set up a matrix to run the following 5 configurations:
+      # 1. <Windows, latest MSVC compiler toolchain on the default runner image, default generator>
+      # 2. <Linux, latest GCC compiler toolchain on the default runner image, default generator>
+      # 3. <Linux, latest Clang compiler toolchain on the default runner image, default generator>
+      # 4. <macOS, AppleClang compiler toolchain on the default runner image, default generator>
+      # 5. <macOS, Homebrew GCC 14 compiler toolchain, default generator>
       #
+      # Every configuration is built once per entry in the build_type list.
       # To add more build types (Release, Debug, RelWithDebInfo, etc.) customize the build_type list.
       matrix:
-        os: [ ubuntu-latest, windows-latest ]
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
         build_type: [ Release, Debug ]
         c_compiler: [ gcc, clang, cl ]
         include:
@@ -38,12 +41,24 @@ jobs:
           - os: ubuntu-latest
             c_compiler: clang
             cpp_compiler: clang++
+          - os: macos-latest
+            c_compiler: clang
+            cpp_compiler: clang++
+          # On macOS the bare gcc/g++ names are AppleClang shims rather than GNU GCC, so the GNU
+          # toolchain has to be addressed through its versioned Homebrew binaries. The extra
+          # c_compiler_bin key overrides CMAKE_C_COMPILER for this row only; it is unset elsewhere.
+          - os: macos-latest
+            c_compiler: gcc
+            cpp_compiler: g++-14
+            c_compiler_bin: gcc-14
         exclude:
           - os: windows-latest
             c_compiler: gcc
           - os: windows-latest
             c_compiler: clang
           - os: ubuntu-latest
+            c_compiler: cl
+          - os: macos-latest
             c_compiler: cl
 
     steps:
@@ -56,13 +71,18 @@ jobs:
         run: |
           echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
 
+      - name: Install GCC
+        # The macOS runner images normally ship GCC already, so only install it when it is missing.
+        if: matrix.os == 'macos-latest' && matrix.c_compiler == 'gcc'
+        run: brew list gcc@14 > /dev/null 2>&1 || brew install gcc@14
+
       - name: Configure CMake
         # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
         # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
         run: >
                cmake -B ${{ steps.strings.outputs.build-output-dir }}
                -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
-               -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
+               -DCMAKE_C_COMPILER=${{ matrix.c_compiler_bin || matrix.c_compiler }}
                -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
                -S ${{ github.workspace }}
 
