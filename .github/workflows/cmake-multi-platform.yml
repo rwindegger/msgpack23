@@ -109,9 +109,11 @@ jobs:
 
       - name: Run Coverage
         if: matrix.os == 'windows-latest' && matrix.build_type == 'Debug'
+        env:
+          COVDBG_PROJECT_TOKEN: ${{ secrets.COVDBG_PROJECT_TOKEN }}
         shell: pwsh
         run: |
-          covdbg --fetch-license --config .covdbg.yaml --output ${{ steps.strings.outputs.build-output-dir }}\tests\${{ matrix.build_type }}\msgpack23_tests.covdb ${{ steps.strings.outputs.build-output-dir }}\tests\${{ matrix.build_type }}\msgpack23_tests.exe
+          covdbg --config .covdbg.yaml --output ${{ steps.strings.outputs.build-output-dir }}\tests\${{ matrix.build_type }}\msgpack23_tests.covdb ${{ steps.strings.outputs.build-output-dir }}\tests\${{ matrix.build_type }}\msgpack23_tests.exe
           covdbg convert --format LCOV --input ${{ steps.strings.outputs.build-output-dir }}\tests\${{ matrix.build_type }}\msgpack23_tests.covdb --output ${{ steps.strings.outputs.build-output-dir }}\tests\${{ matrix.build_type }}\msgpack23_tests.lcov
 
       - name: Upload coverage reports to Codecov
