@@ -118,6 +118,6 @@ jobs:
 
       - name: Upload coverage reports to Codecov
         if: matrix.os == 'windows-latest' && matrix.build_type == 'Debug'
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
