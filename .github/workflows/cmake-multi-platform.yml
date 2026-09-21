@@ -103,7 +103,7 @@ jobs:
 
       - name: Setup covdbg
         if: matrix.os == 'windows-latest' && matrix.build_type == 'Debug'
-        uses: covdbg/setup-covdbg@v0
+        uses: liasoft/setup-covdbg@v1
         with:
           version: 'latest'
 
