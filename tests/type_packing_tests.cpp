@@ -10,6 +10,11 @@
 #include <unordered_map>
 
 namespace {
+    struct GuardedStdArray {
+        std::array<int, 2> value{};
+        int guard{42};
+    };
+
     TEST(msgpack23, FloatTypePacking) {
         for (auto i = -5; i < 5; ++i) {
             float expected = 5.0f + static_cast<float>(i) * 23456.78f / 3.14f;
@@ -232,6 +237,36 @@ namespace {
         std::array<std::string, 3> actual{};
         unpacker(actual);
         EXPECT_EQ(expected, actual);
+    }
+
+    TEST(msgpack23, StdArrayRejectsTooManyElements) {
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::Packer packer{inserter};
+        packer(std::array<int, 3>{1, 2, 3});
+
+        GuardedStdArray actual{{9, 9}};
+        msgpack23::Unpacker unpacker{data};
+        EXPECT_THROW(unpacker(actual.value), std::out_of_range);
+        EXPECT_EQ(actual.value, (std::array<int, 2>{9, 9}));
+        EXPECT_EQ(actual.guard, 42);
+    }
+
+    TEST(msgpack23, StdArrayExactSizeRoundTripThenRejectsLargerArray) {
+        std::vector<std::byte> data{};
+        auto const inserter = std::back_insert_iterator(data);
+        msgpack23::Packer packer{inserter};
+        std::array<int, 2> const expected{7, 8};
+        packer(expected);
+        packer(std::array<int, 3>{1, 2, 3});
+
+        GuardedStdArray actual{};
+        msgpack23::Unpacker unpacker{data};
+        unpacker(actual.value);
+        EXPECT_EQ(actual.value, expected);
+        EXPECT_THROW(unpacker(actual.value), std::out_of_range);
+        EXPECT_EQ(actual.value, expected);
+        EXPECT_EQ(actual.guard, 42);
     }
 
     TEST(msgpack23, MapTypePacking) {

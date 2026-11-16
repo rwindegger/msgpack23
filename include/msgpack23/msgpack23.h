@@ -670,6 +670,9 @@ namespace msgpack23 {
             using ValueType = typename T::value_type;
             std::vector<ValueType> vec;
             unpack_type(vec);
+            if (vec.size() > value.size()) {
+                throw std::out_of_range("Unpacked array is larger than the destination.");
+            }
             std::copy(vec.begin(), vec.end(), value.begin());
         }
 
